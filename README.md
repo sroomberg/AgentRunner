@@ -15,11 +15,14 @@ Requires Docker with the [NVIDIA Container Toolkit](https://docs.nvidia.com/data
 ## Quick Start
 
 ```bash
-# Serve a model on port 8000 (waits until the API is ready)
+# Serve a model on port 8000 (foreground — streams vLLM logs until Ctrl+C)
 agent-runner run --model /path/to/my-model --port 8000
 
-# Run in the background and return immediately
-agent-runner run --model /path/to/my-model --port 8000 --detach --no-wait
+# Run in the background; wait for the API to be ready, then return
+agent-runner run --model /path/to/my-model --port 8000 -d
+
+# Run in the background and return immediately without waiting
+agent-runner run --model /path/to/my-model --port 8000 -d --no-wait
 
 # CPU-only (no GPU)
 agent-runner run --model /path/to/my-model --port 8000 --no-gpu

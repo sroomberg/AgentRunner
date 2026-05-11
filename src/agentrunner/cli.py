@@ -49,11 +49,17 @@ def run(
     ] = None,
     detach: Annotated[
         bool,
-        typer.Option("--detach", "-d", help="Start in background; print endpoint and return"),
+        typer.Option(
+            "--detach", "-d",
+            help="Start container in background. Waits for the API to be ready, then returns.",
+        ),
     ] = False,
     wait: Annotated[
         bool,
-        typer.Option("--wait/--no-wait", help="Wait for the API to become ready (implies --detach)"),
+        typer.Option(
+            "--wait/--no-wait",
+            help="When used with --detach: wait for the API to be ready before returning (default: true).",
+        ),
     ] = True,
     extra: Annotated[
         list[str] | None,
@@ -99,14 +105,12 @@ def run(
         *(extra or []),
     ]
 
-    if detach or wait:
-        proc = subprocess.Popen(
+    if detach:
+        subprocess.Popen(
             docker_cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        _ = proc
-
         if wait:
             console.print("[dim]Waiting for API to become ready…[/dim]")
             if wait_ready(config):
@@ -119,7 +123,7 @@ def run(
                 )
                 console.print(f"  Endpoint: {config.endpoint}")
         else:
-            console.print(f"Container started. Endpoint: {config.endpoint}")
+            console.print(f"Container started in background. Endpoint: {config.endpoint}")
     else:
         try:
             subprocess.run(docker_cmd, check=True)
