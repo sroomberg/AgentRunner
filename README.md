@@ -53,6 +53,13 @@ agent-runner stop
 | `stop` | Stop and remove the container |
 | `status` | Show container state and API health |
 | `logs` | Print container logs |
+| `session create` | Create a persistent chat session |
+| `session chat` | Send a one-shot message in a session |
+| `session attach` | Open an interactive REPL for a session |
+| `session list` | List all sessions |
+| `session history` | Print conversation history |
+| `session clear` | Clear conversation history |
+| `session delete` | Delete a session |
 | `db ingest` | Add documents or code to the vector database |
 | `db search` | Query the vector database for relevant context |
 | `db history` | Store a conversation message |
@@ -76,6 +83,47 @@ agent-runner stop
 | `--wait/--no-wait` | `--wait` | Wait for API to be ready (implies background start) |
 
 Extra positional arguments are forwarded verbatim to vLLM.
+
+## Sessions
+
+Sessions are persistent, named conversations tied to a running model. Each session maintains sequential conversation history and optionally retrieves semantic context from the vector database.
+
+Sessions are stored as JSON files in `~/.agentrunner/sessions/` (override with `--sessions-dir`).
+
+```bash
+# Create a session (auto-resolves endpoint if one container is running)
+agent-runner session create my-session
+
+# Create a session bound to a specific container, with context retrieval
+agent-runner session create my-session \
+  --container agentrunner-llama3 \
+  --embedding-model llama3 \
+  --system-prompt "You are a helpful coding assistant."
+
+# One-shot message
+agent-runner session chat my-session "Explain the main training loop"
+
+# Interactive REPL (supports /history, /context <query>, /reset, /exit)
+agent-runner session attach my-session
+
+# View conversation history
+agent-runner session history my-session --last 10
+
+# List all sessions
+agent-runner session list
+
+# Clear history (keeps session config)
+agent-runner session clear my-session
+
+# Delete a session
+agent-runner session delete my-session
+```
+
+### Context retrieval
+
+When a session is created with `--embedding-model`, each message automatically retrieves the most relevant chunks from the session's vector store (documents and code) and injects them as system context before the conversation history. Exchanges are also stored in the ChromaDB history collection for future semantic search.
+
+If the embedding endpoint is unavailable, retrieval is silently skipped and the session continues with history-only context.
 
 ## Vector Context Database
 

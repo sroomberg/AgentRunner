@@ -20,6 +20,7 @@ from .runner import (
     stop_all,
     wait_ready,
 )
+from .sessions.cli import session_app
 from .vectordb.cli import db_app
 
 app = typer.Typer(
@@ -28,6 +29,7 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(db_app, name="db")
+app.add_typer(session_app, name="session")
 console = Console()
 
 _NAME_HELP = "Container name (default: agentrunner-<model-dir-name>)"
