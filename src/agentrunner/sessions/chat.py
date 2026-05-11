@@ -35,8 +35,8 @@ def chat(
     if session.system_prompt:
         messages.append({"role": "system", "content": session.system_prompt})
 
-    # Semantic context retrieval
-    context_text = _retrieve_context(session, user_message, n_context)
+    # Semantic context retrieval (skip entirely if no embedding model configured)
+    context_text = _retrieve_context(session, user_message, n_context) if session.embedding_model else ""
     if context_text:
         messages.append({"role": "system", "content": f"Relevant context:\n\n{context_text}"})
 

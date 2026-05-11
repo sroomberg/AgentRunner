@@ -37,6 +37,30 @@ agent-runner logs --follow
 agent-runner stop
 ```
 
+## Multiple Models
+
+Multiple models can run concurrently, each in its own container on a different port. The container name defaults to `agentrunner-<model-dir-name>`.
+
+```bash
+# Start two models on different ports
+agent-runner run --model /models/llama3 --port 8001 -d
+agent-runner run --model /models/mistral --port 8002 -d
+
+# List all running AgentRunner containers
+agent-runner ps
+
+# Check health of all containers at once
+agent-runner status
+
+# Stop a specific container
+agent-runner stop --name agentrunner-llama3
+
+# Stop all AgentRunner containers
+agent-runner stop --all
+```
+
+When only one container is running, `stop`, `status`, `logs`, and `session create` all auto-resolve to it without needing `--name`.
+
 ## How It Works
 
 1. `agent-runner run` resolves the model path and pulls `vllm/vllm-openai:latest` if needed
@@ -50,8 +74,9 @@ agent-runner stop
 | Command | Description |
 |---------|-------------|
 | `run` | Start a vLLM container for a model |
-| `stop` | Stop and remove the container |
-| `status` | Show container state and API health |
+| `ps` | List all running AgentRunner containers |
+| `stop` | Stop a container (`--all` to stop every managed container) |
+| `status` | Show container and API health (all containers if no `--name`) |
 | `logs` | Print container logs |
 | `session create` | Create a persistent chat session |
 | `session chat` | Send a one-shot message in a session |
@@ -75,7 +100,7 @@ agent-runner stop
 |------|---------|-------------|
 | `--model`, `-m` | (required) | Path to the model directory |
 | `--port`, `-p` | `8000` | Host port for the vLLM API |
-| `--name`, `-n` | `agentrunner` | Docker container name |
+| `--name`, `-n` | `agentrunner-<model-dir>` | Docker container name |
 | `--gpu/--no-gpu` | `--gpu` | Enable/disable GPU passthrough |
 | `--dtype` | `auto` | Model dtype (`auto`, `float16`, `bfloat16`, `float32`) |
 | `--max-model-len` | — | Override max context length |
