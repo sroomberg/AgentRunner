@@ -10,16 +10,27 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from .runner import RunConfig, logs, start, status, stop, wait_ready
+from .runner import (
+    RunConfig,
+    build_docker_run_cmd,
+    list_containers,
+    logs,
+    status,
+    stop,
+    stop_all,
+    wait_ready,
+)
 from .vectordb.cli import db_app
 
 app = typer.Typer(
     name="agent-runner",
-    help="Run a local model via vLLM in a Docker container.",
+    help="Run local models via vLLM in Docker containers.",
     no_args_is_help=True,
 )
 app.add_typer(db_app, name="db")
 console = Console()
+
+_NAME_HELP = "Container name (default: agentrunner-<model-dir-name>)"
 
 
 @app.command()
@@ -33,9 +44,9 @@ def run(
         typer.Option("--port", "-p", help="Host port to expose the vLLM API on"),
     ] = 8000,
     name: Annotated[
-        str,
-        typer.Option("--name", "-n", help="Docker container name"),
-    ] = "agentrunner",
+        str | None,
+        typer.Option("--name", "-n", help=_NAME_HELP),
+    ] = None,
     gpu: Annotated[
         bool,
         typer.Option("--gpu/--no-gpu", help="Pass --gpus all to the container"),
@@ -52,14 +63,14 @@ def run(
         bool,
         typer.Option(
             "--detach", "-d",
-            help="Start container in background. Waits for the API to be ready, then returns.",
+            help="Start container in background; wait for API ready, then return.",
         ),
     ] = False,
     wait: Annotated[
         bool,
         typer.Option(
             "--wait/--no-wait",
-            help="When used with --detach: wait for the API to be ready before returning (default: true).",
+            help="With --detach: wait for the API to be ready before returning.",
         ),
     ] = True,
     extra: Annotated[
@@ -78,40 +89,18 @@ def run(
         extra_args=extra or [],
     )
 
-    try:
-        model_path = model.resolve()
-    except Exception:
-        model_path = model
-
-    console.print(f"[bold]Starting vLLM container[/bold] '{name}'")
+    model_path = model.resolve()
+    console.print(f"[bold]Starting vLLM container[/bold] '{config.container_name}'")
     console.print(f"  Model:    {model_path}")
     console.print(f"  Model ID: {config.model_id}")
     console.print(f"  Port:     {port}")
     console.print(f"  GPU:      {'yes' if gpu else 'no'}")
     console.print()
 
-    docker_cmd = [
-        "docker", "run", "--rm",
-        "--name", name,
-        "-p", f"{port}:8000",
-        "-v", f"{model_path}:/model:ro",
-        *(["--gpus", "all"] if gpu else []),
-        "vllm/vllm-openai:latest",
-        "--model", "/model",
-        "--served-model-name", config.model_id,
-        "--dtype", dtype,
-        "--host", "0.0.0.0",
-        "--port", "8000",
-        *(["--max-model-len", str(max_model_len)] if max_model_len else []),
-        *(extra or []),
-    ]
+    docker_cmd = build_docker_run_cmd(config)
 
     if detach:
-        subprocess.Popen(
-            docker_cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        subprocess.Popen(docker_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if wait:
             console.print("[dim]Waiting for API to become ready…[/dim]")
             if wait_ready(config):
@@ -124,7 +113,7 @@ def run(
                 )
                 console.print(f"  Endpoint: {config.endpoint}")
         else:
-            console.print(f"Container started in background. Endpoint: {config.endpoint}")
+            console.print(f"Container started. Endpoint: {config.endpoint}")
     else:
         try:
             subprocess.run(docker_cmd, check=True)
@@ -139,14 +128,40 @@ def run(
 @app.command(name="stop")
 def stop_cmd(
     name: Annotated[
-        str,
+        str | None,
         typer.Option("--name", "-n", help="Container name to stop"),
-    ] = "agentrunner",
+    ] = None,
+    all_containers: Annotated[
+        bool,
+        typer.Option("--all", "-a", help="Stop all AgentRunner-managed containers"),
+    ] = False,
 ) -> None:
-    """Stop and remove a running AgentRunner container."""
+    """Stop one or all AgentRunner containers."""
+    if all_containers:
+        stopped = stop_all()
+        if stopped:
+            for n in stopped:
+                console.print(f"[green]Stopped '{n}'.[/green]")
+        else:
+            console.print("[yellow]No running AgentRunner containers found.[/yellow]")
+        return
+
+    if name is None:
+        running = list_containers()
+        if len(running) == 1:
+            name = running[0]["name"]
+        elif len(running) == 0:
+            console.print("[yellow]No running AgentRunner containers found.[/yellow]")
+            raise typer.Exit(1)
+        else:
+            console.print("[red]Multiple containers running — specify --name or use --all:[/red]")
+            for c in running:
+                console.print(f"  {c['name']}")
+            raise typer.Exit(1)
+
     try:
         stop(name)
-        console.print(f"[green]Stopped container '{name}'.[/green]")
+        console.print(f"[green]Stopped '{name}'.[/green]")
     except RuntimeError as e:
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(1) from e
@@ -155,14 +170,60 @@ def stop_cmd(
         raise typer.Exit(e.returncode) from e
 
 
+@app.command(name="ps")
+def ps_cmd() -> None:
+    """List all running AgentRunner-managed containers."""
+    containers = list_containers()
+    if not containers:
+        console.print("[dim]No AgentRunner containers running.[/dim]")
+        return
+
+    table = Table("Name", "Model", "Port", "Endpoint", "Status", show_header=True)
+    for c in containers:
+        table.add_row(
+            c["name"],
+            c["model_id"],
+            str(c["port"] or "?"),
+            c["endpoint"],
+            c["status"],
+        )
+    console.print(table)
+
+
 @app.command(name="status")
 def status_cmd(
     name: Annotated[
-        str,
-        typer.Option("--name", "-n", help="Container name to inspect"),
-    ] = "agentrunner",
+        str | None,
+        typer.Option("--name", "-n", help="Container name (omit to show all)"),
+    ] = None,
 ) -> None:
-    """Show the status of a running AgentRunner container."""
+    """Show container and API status. Omit --name to show all containers."""
+    if name is None:
+        # Show summary table for all managed containers
+        containers = list_containers()
+        if not containers:
+            console.print("[dim]No AgentRunner containers running.[/dim]")
+            raise typer.Exit(1)
+
+        table = Table("Name", "Model", "Port", "API", "Status", show_header=True)
+        all_healthy = True
+        for c in containers:
+            info = status(c["name"])
+            api_str = "[green]healthy[/green]" if info["api_healthy"] else "[yellow]unreachable[/yellow]"
+            if not info["api_healthy"]:
+                all_healthy = False
+            table.add_row(
+                c["name"],
+                c["model_id"],
+                str(c["port"] or "?"),
+                api_str,
+                c["status"],
+            )
+        console.print(table)
+        if not all_healthy:
+            raise typer.Exit(1)
+        return
+
     info = status(name)
 
     table = Table(show_header=False, box=None, padding=(0, 2))
@@ -174,12 +235,10 @@ def status_cmd(
 
     table.add_row("Container", running_str)
     table.add_row("API", api_str)
-
     if info["container"]:
         table.add_row("Started", info["container"].get("StartedAt", "—"))
 
     console.print(table)
-
     if not info["running"]:
         raise typer.Exit(1)
 
@@ -187,15 +246,28 @@ def status_cmd(
 @app.command(name="logs")
 def logs_cmd(
     name: Annotated[
-        str,
-        typer.Option("--name", "-n", help="Container name"),
-    ] = "agentrunner",
+        str | None,
+        typer.Option("--name", "-n", help="Container name (auto-resolved if only one is running)"),
+    ] = None,
     follow: Annotated[
         bool,
         typer.Option("--follow", "-f", help="Follow log output"),
     ] = False,
 ) -> None:
     """Print logs from an AgentRunner container."""
+    if name is None:
+        running = list_containers()
+        if len(running) == 1:
+            name = running[0]["name"]
+        elif len(running) == 0:
+            console.print("[yellow]No running AgentRunner containers found.[/yellow]")
+            raise typer.Exit(1)
+        else:
+            console.print("[red]Multiple containers running — specify --name:[/red]")
+            for c in running:
+                console.print(f"  {c['name']}")
+            raise typer.Exit(1)
+
     try:
         logs(name, follow=follow)
     except subprocess.CalledProcessError as e:

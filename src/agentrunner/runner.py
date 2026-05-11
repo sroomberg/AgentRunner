@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import time
 import urllib.request
@@ -13,12 +14,16 @@ VLLM_IMAGE = "vllm/vllm-openai:latest"
 HEALTH_TIMEOUT = 300
 HEALTH_INTERVAL = 3
 
+MANAGED_LABEL = "com.agentrunner.managed"
+MODEL_LABEL = "com.agentrunner.model"
+MODEL_PATH_LABEL = "com.agentrunner.model_path"
+
 
 @dataclass
 class RunConfig:
     model_path: Path
     port: int = 8000
-    name: str = "agentrunner"
+    name: str | None = None  # None → derived from model dir name
     gpu: bool = True
     dtype: str = "auto"
     max_model_len: int | None = None
@@ -29,14 +34,17 @@ class RunConfig:
         return self.model_path.resolve().name
 
     @property
+    def container_name(self) -> str:
+        return self.name or f"agentrunner-{self.model_id}"
+
+    @property
     def endpoint(self) -> str:
         return f"http://localhost:{self.port}"
 
 
 def _docker(*args: str, capture: bool = False) -> subprocess.CompletedProcess:
-    cmd = ["docker", *args]
     return subprocess.run(
-        cmd,
+        ["docker", *args],
         check=True,
         capture_output=capture,
         text=True,
@@ -63,29 +71,36 @@ def _wait_ready(endpoint: str, timeout: int = HEALTH_TIMEOUT) -> bool:
     return False
 
 
-def start(config: RunConfig) -> None:
-    """Start a vLLM container serving *config.model_path* on *config.port*."""
+def _parse_host_port(ports_str: str) -> int | None:
+    """Extract the host port from a Docker Ports string like '0.0.0.0:8001->8000/tcp'."""
+    m = re.search(r":(\d+)->8000", ports_str)
+    return int(m.group(1)) if m else None
+
+
+def _parse_labels(labels_str: str) -> dict[str, str]:
+    """Parse Docker's comma-separated 'key=value,key=value' label string."""
+    result: dict[str, str] = {}
+    for part in labels_str.split(","):
+        part = part.strip()
+        if "=" in part:
+            k, _, v = part.partition("=")
+            result[k.strip()] = v.strip()
+    return result
+
+
+def build_docker_run_cmd(config: RunConfig) -> list[str]:
     model_path = config.model_path.resolve()
-    if not model_path.exists():
-        raise FileNotFoundError(f"Model path not found: {model_path}")
-
-    if _container_exists(config.name):
-        raise RuntimeError(
-            f"Container '{config.name}' already exists. "
-            "Run `agent-runner stop` first or use a different --name."
-        )
-
     cmd = [
-        "run",
-        "--rm",
-        "--name", config.name,
+        "docker", "run", "--rm",
+        "--name", config.container_name,
         "-p", f"{config.port}:8000",
         "-v", f"{model_path}:/model:ro",
+        f"--label={MANAGED_LABEL}=true",
+        f"--label={MODEL_LABEL}={config.model_id}",
+        f"--label={MODEL_PATH_LABEL}={model_path}",
     ]
-
     if config.gpu:
         cmd += ["--gpus", "all"]
-
     cmd += [
         VLLM_IMAGE,
         "--model", "/model",
@@ -94,29 +109,77 @@ def start(config: RunConfig) -> None:
         "--host", "0.0.0.0",
         "--port", "8000",
     ]
-
     if config.max_model_len is not None:
         cmd += ["--max-model-len", str(config.max_model_len)]
-
     cmd += config.extra_args
+    return cmd
 
-    _docker(*cmd)
+
+def start(config: RunConfig) -> None:
+    """Start a vLLM container (foreground, blocking)."""
+    model_path = config.model_path.resolve()
+    if not model_path.exists():
+        raise FileNotFoundError(f"Model path not found: {model_path}")
+    if _container_exists(config.container_name):
+        raise RuntimeError(
+            f"Container '{config.container_name}' already exists. "
+            "Stop it first or use a different --name."
+        )
+    subprocess.run(build_docker_run_cmd(config), check=True)
 
 
-def stop(name: str = "agentrunner") -> None:
-    """Stop and remove the named container."""
+def stop(name: str) -> None:
+    """Stop and remove a named container."""
     if not _container_exists(name):
         raise RuntimeError(f"No container named '{name}' found.")
     _docker("stop", name)
 
 
-def status(name: str = "agentrunner") -> dict:
-    """Return a dict with container state and API health."""
+def stop_all() -> list[str]:
+    """Stop all AgentRunner-managed containers. Returns list of stopped names."""
+    containers = list_containers()
+    stopped = []
+    for c in containers:
+        _docker("stop", c["name"])
+        stopped.append(c["name"])
+    return stopped
+
+
+def list_containers() -> list[dict]:
+    """Return info for all running AgentRunner-managed containers."""
     result = subprocess.run(
         [
-            "docker", "inspect", name,
-            "--format", "{{json .State}}",
+            "docker", "ps",
+            "--filter", f"label={MANAGED_LABEL}=true",
+            "--format", "{{json .}}",
         ],
+        capture_output=True,
+        text=True,
+    )
+    containers = []
+    for line in result.stdout.strip().splitlines():
+        if not line:
+            continue
+        data = json.loads(line)
+        labels = _parse_labels(data.get("Labels", ""))
+        host_port = _parse_host_port(data.get("Ports", ""))
+        model_id = labels.get(MODEL_LABEL, "?")
+        model_path = labels.get(MODEL_PATH_LABEL, "?")
+        containers.append({
+            "name": data["Names"],
+            "model_id": model_id,
+            "model_path": model_path,
+            "port": host_port,
+            "endpoint": f"http://localhost:{host_port}" if host_port else "?",
+            "status": data.get("Status", "?"),
+        })
+    return containers
+
+
+def status(name: str) -> dict:
+    """Return container state and API health for a named container."""
+    result = subprocess.run(
+        ["docker", "inspect", name, "--format", "{{json .State}}"],
         capture_output=True,
         text=True,
     )
@@ -150,11 +213,11 @@ def status(name: str = "agentrunner") -> dict:
 
 
 def wait_ready(config: RunConfig) -> bool:
-    """Block until the vLLM API is reachable, or timeout. Returns True on success."""
+    """Block until the vLLM API is reachable, or timeout."""
     return _wait_ready(config.endpoint)
 
 
-def logs(name: str = "agentrunner", follow: bool = False) -> None:
+def logs(name: str, follow: bool = False) -> None:
     """Stream or print container logs."""
     cmd = ["logs"]
     if follow:
