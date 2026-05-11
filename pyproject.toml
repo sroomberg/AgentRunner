@@ -12,6 +12,7 @@ license = "MIT"
 dependencies = [
     "typer>=0.9",
     "rich>=13.0",
+    "chromadb>=0.5",
 ]
 
 [project.optional-dependencies]

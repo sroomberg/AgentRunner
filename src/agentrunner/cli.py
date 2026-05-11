@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -12,12 +11,14 @@ from rich.console import Console
 from rich.table import Table
 
 from .runner import RunConfig, logs, start, status, stop, wait_ready
+from .vectordb.cli import db_app
 
 app = typer.Typer(
     name="agent-runner",
     help="Run a local model via vLLM in a Docker container.",
     no_args_is_help=True,
 )
+app.add_typer(db_app, name="db")
 console = Console()
 
 

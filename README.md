@@ -53,6 +53,12 @@ agent-runner stop
 | `stop` | Stop and remove the container |
 | `status` | Show container state and API health |
 | `logs` | Print container logs |
+| `db ingest` | Add documents or code to the vector database |
+| `db search` | Query the vector database for relevant context |
+| `db history` | Store a conversation message |
+| `db summarize` | Replace a session's history with an abridged summary |
+| `db sync` | Sync the vector DB to/from S3 |
+| `db stats` | Show collection sizes |
 
 ## Options
 
@@ -70,6 +76,38 @@ agent-runner stop
 | `--wait/--no-wait` | `--wait` | Wait for API to be ready (implies background start) |
 
 Extra positional arguments are forwarded verbatim to vLLM.
+
+## Vector Context Database
+
+AgentRunner includes a local vector database (backed by [ChromaDB](https://docs.trychroma.com/)) that stores documents, code, and conversation history as embeddings. Embeddings are generated using the same vLLM server the model runs on.
+
+```bash
+# Ingest a directory of documents
+agent-runner db ingest ./docs --type documents --model my-model
+
+# Ingest a codebase
+agent-runner db ingest ./src --type code --model my-model
+
+# Search for relevant context
+agent-runner db search "how does auth work" --collection code --model my-model
+
+# Store a conversation message
+agent-runner db history "Explain the main loop" --role user --session my-session --model my-model
+
+# Abridge old history with a summary
+agent-runner db summarize --session my-session "Previous conversation covered auth and the main loop." --model my-model
+
+# Push DB to S3
+agent-runner db sync s3://my-bucket/vectordb --direction push
+
+# Pull DB from S3
+agent-runner db sync s3://my-bucket/vectordb --direction pull
+
+# Show collection sizes
+agent-runner db stats
+```
+
+The DB directory (`./vectordb` by default, override with `--db-path`) can be mounted as a Docker volume for persistence and shared across machines via S3 sync.
 
 ## Using the API
 
