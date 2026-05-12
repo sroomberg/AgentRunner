@@ -101,11 +101,11 @@ When only one container is running, `stop`, `status`, `logs`, and `session creat
 | `--model`, `-m` | (required) | Path to the model directory |
 | `--port`, `-p` | `8000` | Host port for the vLLM API |
 | `--name`, `-n` | `vllmd-<model-dir>` | Docker container name |
-| `--gpu/--no-gpu` | `--gpu` | Enable/disable GPU passthrough |
+| `--no-gpu` | — | Disable GPU passthrough |
 | `--dtype` | `auto` | Model dtype (`auto`, `float16`, `bfloat16`, `float32`) |
 | `--max-model-len` | — | Override max context length |
-| `--detach`, `-d` | `false` | Start in background |
-| `--wait/--no-wait` | `--wait` | Wait for API to be ready (implies background start) |
+| `--detach`, `-d` | — | Start in background |
+| `--no-wait` | — | With `--detach`: return immediately without waiting for API ready |
 
 Extra positional arguments are forwarded verbatim to vLLM.
 

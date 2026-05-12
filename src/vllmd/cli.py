@@ -50,10 +50,10 @@ def run(
         str | None,
         typer.Option("--name", "-n", help=_NAME_HELP),
     ] = None,
-    gpu: Annotated[
+    no_gpu: Annotated[
         bool,
-        typer.Option("--gpu/--no-gpu", help="Pass --gpus all to the container"),
-    ] = True,
+        typer.Option("--no-gpu", is_flag=True, help="Disable GPU (--gpus all)"),
+    ] = False,
     dtype: Annotated[
         str,
         typer.Option("--dtype", help="Model dtype (auto, float16, bfloat16, float32)"),
@@ -71,19 +71,22 @@ def run(
             help="Start container in background; wait for API ready, then return.",
         ),
     ] = False,
-    wait: Annotated[
+    no_wait: Annotated[
         bool,
         typer.Option(
-            "--wait/--no-wait",
-            help="With --detach: wait for the API to be ready before returning.",
+            "--no-wait",
+            is_flag=True,
+            help="With --detach: return immediately without waiting for API ready.",
         ),
-    ] = True,
+    ] = False,
     extra: Annotated[
         list[str] | None,
         typer.Argument(help="Extra args forwarded verbatim to vLLM"),
     ] = None,
 ) -> None:
     """Start a vLLM container serving MODEL on PORT."""
+    gpu = not no_gpu
+    wait = not no_wait
     config = RunConfig(
         model_path=model,
         port=port,
