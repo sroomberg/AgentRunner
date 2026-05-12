@@ -24,7 +24,7 @@ from .sessions.cli import session_app
 from .vectordb.cli import db_app
 
 app = typer.Typer(
-    name="agent-runner",
+    name="vllmctl",
     help="Run local models via vLLM in Docker containers.",
     no_args_is_help=True,
 )
@@ -32,7 +32,7 @@ app.add_typer(db_app, name="db")
 app.add_typer(session_app, name="session")
 console = Console()
 
-_NAME_HELP = "Container name (default: agentrunner-<model-dir-name>)"
+_NAME_HELP = "Container name (default: vllmctl-<model-dir-name>)"
 
 
 @app.command()
@@ -138,17 +138,17 @@ def stop_cmd(
     ] = None,
     all_containers: Annotated[
         bool,
-        typer.Option("--all", "-a", help="Stop all AgentRunner-managed containers"),
+        typer.Option("--all", "-a", help="Stop all vllmctl-managed containers"),
     ] = False,
 ) -> None:
-    """Stop one or all AgentRunner containers."""
+    """Stop one or all vllmctl containers."""
     if all_containers:
         stopped = stop_all()
         if stopped:
             for n in stopped:
                 console.print(f"[green]Stopped '{n}'.[/green]")
         else:
-            console.print("[yellow]No running AgentRunner containers found.[/yellow]")
+            console.print("[yellow]No running vllmctl containers found.[/yellow]")
         return
 
     if name is None:
@@ -156,7 +156,7 @@ def stop_cmd(
         if len(running) == 1:
             name = running[0]["name"]
         elif len(running) == 0:
-            console.print("[yellow]No running AgentRunner containers found.[/yellow]")
+            console.print("[yellow]No running vllmctl containers found.[/yellow]")
             raise typer.Exit(1)
         else:
             console.print(
@@ -179,10 +179,10 @@ def stop_cmd(
 
 @app.command(name="ps")
 def ps_cmd() -> None:
-    """List all running AgentRunner-managed containers."""
+    """List all running vllmctl-managed containers."""
     containers = list_containers()
     if not containers:
-        console.print("[dim]No AgentRunner containers running.[/dim]")
+        console.print("[dim]No vllmctl containers running.[/dim]")
         return
 
     table = Table("Name", "Model", "Port", "Endpoint", "Status", show_header=True)
@@ -209,7 +209,7 @@ def status_cmd(
         # Show summary table for all managed containers
         containers = list_containers()
         if not containers:
-            console.print("[dim]No AgentRunner containers running.[/dim]")
+            console.print("[dim]No vllmctl containers running.[/dim]")
             raise typer.Exit(1)
 
         table = Table("Name", "Model", "Port", "API", "Status", show_header=True)
@@ -271,13 +271,13 @@ def logs_cmd(
         typer.Option("--follow", "-f", help="Follow log output"),
     ] = False,
 ) -> None:
-    """Print logs from an AgentRunner container."""
+    """Print logs from a vllmctl container."""
     if name is None:
         running = list_containers()
         if len(running) == 1:
             name = running[0]["name"]
         elif len(running) == 0:
-            console.print("[yellow]No running AgentRunner containers found.[/yellow]")
+            console.print("[yellow]No running vllmctl containers found.[/yellow]")
             raise typer.Exit(1)
         else:
             console.print("[red]Multiple containers running — specify --name:[/red]")

@@ -1,4 +1,4 @@
-# AgentRunner
+# vllmctl
 
 > **⚠️ Experimental** — This project is under active development. APIs, config format, and CLI flags may change without notice.
 
@@ -16,54 +16,54 @@ Requires Docker with the [NVIDIA Container Toolkit](https://docs.nvidia.com/data
 
 ```bash
 # Serve a model on port 8000 (foreground — streams vLLM logs until Ctrl+C)
-agent-runner run --model /path/to/my-model --port 8000
+vllmctl run --model /path/to/my-model --port 8000
 
 # Run in the background; wait for the API to be ready, then return
-agent-runner run --model /path/to/my-model --port 8000 -d
+vllmctl run --model /path/to/my-model --port 8000 -d
 
 # Run in the background and return immediately without waiting
-agent-runner run --model /path/to/my-model --port 8000 -d --no-wait
+vllmctl run --model /path/to/my-model --port 8000 -d --no-wait
 
 # CPU-only (no GPU)
-agent-runner run --model /path/to/my-model --port 8000 --no-gpu
+vllmctl run --model /path/to/my-model --port 8000 --no-gpu
 
 # Check if the container is up and the API is healthy
-agent-runner status
+vllmctl status
 
 # Stream container logs
-agent-runner logs --follow
+vllmctl logs --follow
 
 # Stop the container
-agent-runner stop
+vllmctl stop
 ```
 
 ## Multiple Models
 
-Multiple models can run concurrently, each in its own container on a different port. The container name defaults to `agentrunner-<model-dir-name>`.
+Multiple models can run concurrently, each in its own container on a different port. The container name defaults to `vllmctl-<model-dir-name>`.
 
 ```bash
 # Start two models on different ports
-agent-runner run --model /models/llama3 --port 8001 -d
-agent-runner run --model /models/mistral --port 8002 -d
+vllmctl run --model /models/llama3 --port 8001 -d
+vllmctl run --model /models/mistral --port 8002 -d
 
-# List all running AgentRunner containers
-agent-runner ps
+# List all running vllmctl containers
+vllmctl ps
 
 # Check health of all containers at once
-agent-runner status
+vllmctl status
 
 # Stop a specific container
-agent-runner stop --name agentrunner-llama3
+vllmctl stop --name vllmctl-llama3
 
-# Stop all AgentRunner containers
-agent-runner stop --all
+# Stop all vllmctl containers
+vllmctl stop --all
 ```
 
 When only one container is running, `stop`, `status`, `logs`, and `session create` all auto-resolve to it without needing `--name`.
 
 ## How It Works
 
-1. `agent-runner run` resolves the model path and pulls `vllm/vllm-openai:latest` if needed
+1. `vllmctl run` resolves the model path and pulls `vllm/vllm-openai:latest` if needed
 2. A Docker container is started with the model directory mounted read-only at `/model`
 3. vLLM serves the model on port 8000 inside the container, mapped to `--port` on the host
 4. The served model ID is the directory name of the model path
@@ -74,7 +74,7 @@ When only one container is running, `stop`, `status`, `logs`, and `session creat
 | Command | Description |
 |---------|-------------|
 | `run` | Start a vLLM container for a model |
-| `ps` | List all running AgentRunner containers |
+| `ps` | List all running vllmctl containers |
 | `stop` | Stop a container (`--all` to stop every managed container) |
 | `status` | Show container and API health (all containers if no `--name`) |
 | `logs` | Print container logs |
@@ -100,7 +100,7 @@ When only one container is running, `stop`, `status`, `logs`, and `session creat
 |------|---------|-------------|
 | `--model`, `-m` | (required) | Path to the model directory |
 | `--port`, `-p` | `8000` | Host port for the vLLM API |
-| `--name`, `-n` | `agentrunner-<model-dir>` | Docker container name |
+| `--name`, `-n` | `vllmctl-<model-dir>` | Docker container name |
 | `--gpu/--no-gpu` | `--gpu` | Enable/disable GPU passthrough |
 | `--dtype` | `auto` | Model dtype (`auto`, `float16`, `bfloat16`, `float32`) |
 | `--max-model-len` | — | Override max context length |
@@ -113,35 +113,35 @@ Extra positional arguments are forwarded verbatim to vLLM.
 
 Sessions are persistent, named conversations tied to a running model. Each session maintains sequential conversation history and optionally retrieves semantic context from the vector database.
 
-Sessions are stored as JSON files in `~/.agentrunner/sessions/` (override with `--sessions-dir`).
+Sessions are stored as JSON files in `~/.vllmctl/sessions/` (override with `--sessions-dir`).
 
 ```bash
 # Create a session (auto-resolves endpoint if one container is running)
-agent-runner session create my-session
+vllmctl session create my-session
 
 # Create a session bound to a specific container, with context retrieval
-agent-runner session create my-session \
-  --container agentrunner-llama3 \
+vllmctl session create my-session \
+  --container vllmctl-llama3 \
   --embedding-model llama3 \
   --system-prompt "You are a helpful coding assistant."
 
 # One-shot message
-agent-runner session chat my-session "Explain the main training loop"
+vllmctl session chat my-session "Explain the main training loop"
 
 # Interactive REPL (supports /history, /context <query>, /reset, /exit)
-agent-runner session attach my-session
+vllmctl session attach my-session
 
 # View conversation history
-agent-runner session history my-session --last 10
+vllmctl session history my-session --last 10
 
 # List all sessions
-agent-runner session list
+vllmctl session list
 
 # Clear history (keeps session config)
-agent-runner session clear my-session
+vllmctl session clear my-session
 
 # Delete a session
-agent-runner session delete my-session
+vllmctl session delete my-session
 ```
 
 ### Context retrieval
@@ -152,32 +152,32 @@ If the embedding endpoint is unavailable, retrieval is silently skipped and the 
 
 ## Vector Context Database
 
-AgentRunner includes a local vector database (backed by [ChromaDB](https://docs.trychroma.com/)) that stores documents, code, and conversation history as embeddings. Embeddings are generated using the same vLLM server the model runs on.
+vllmctl includes a local vector database (backed by [ChromaDB](https://docs.trychroma.com/)) that stores documents, code, and conversation history as embeddings. Embeddings are generated using the same vLLM server the model runs on.
 
 ```bash
 # Ingest a directory of documents
-agent-runner db ingest ./docs --type documents --model my-model
+vllmctl db ingest ./docs --type documents --model my-model
 
 # Ingest a codebase
-agent-runner db ingest ./src --type code --model my-model
+vllmctl db ingest ./src --type code --model my-model
 
 # Search for relevant context
-agent-runner db search "how does auth work" --collection code --model my-model
+vllmctl db search "how does auth work" --collection code --model my-model
 
 # Store a conversation message
-agent-runner db history "Explain the main loop" --role user --session my-session --model my-model
+vllmctl db history "Explain the main loop" --role user --session my-session --model my-model
 
 # Abridge old history with a summary
-agent-runner db summarize --session my-session "Previous conversation covered auth and the main loop." --model my-model
+vllmctl db summarize --session my-session "Previous conversation covered auth and the main loop." --model my-model
 
 # Push DB to S3
-agent-runner db sync s3://my-bucket/vectordb --direction push
+vllmctl db sync s3://my-bucket/vectordb --direction push
 
 # Pull DB from S3
-agent-runner db sync s3://my-bucket/vectordb --direction pull
+vllmctl db sync s3://my-bucket/vectordb --direction pull
 
 # Show collection sizes
-agent-runner db stats
+vllmctl db stats
 ```
 
 The DB directory (`./vectordb` by default, override with `--db-path`) can be mounted as a Docker volume for persistence and shared across machines via S3 sync.
@@ -219,5 +219,5 @@ pytest
 ## Docker
 
 ```bash
-MODEL_PATH=/path/to/my-model docker compose run --rm agent-runner run --model /model --port 8000
+MODEL_PATH=/path/to/my-model docker compose run --rm vllmctl run --model /model --port 8000
 ```

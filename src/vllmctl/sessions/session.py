@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-DEFAULT_SESSIONS_DIR = Path.home() / ".agentrunner" / "sessions"
+DEFAULT_SESSIONS_DIR = Path.home() / ".vllmctl" / "sessions"
 
 
 @dataclass

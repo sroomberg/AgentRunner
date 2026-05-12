@@ -1,4 +1,4 @@
-"""AgentRunner — run a local model via vLLM in a Docker container."""
+"""vllmctl — run local models via vLLM in Docker containers."""
 
 from .runner import RunConfig, logs, start, status, stop
 
