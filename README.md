@@ -1,7 +1,5 @@
 # vllmd
 
-> **⚠️ Experimental** — This project is under active development. APIs, config format, and CLI flags may change without notice.
-
 Run a model that is already on the machine in a [vLLM](https://github.com/vllm-project/vllm) container and serve it on a specified port with an OpenAI-compatible API.
 
 ## Install
