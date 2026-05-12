@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import time
 import uuid
@@ -14,9 +15,26 @@ from chromadb.config import Settings
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 100
 CODE_EXTENSIONS = {
-    ".py", ".js", ".ts", ".tsx", ".jsx", ".go", ".rs", ".java",
-    ".c", ".cpp", ".h", ".hpp", ".rb", ".sh", ".yaml", ".yml",
-    ".toml", ".json", ".md", ".txt",
+    ".py",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".hpp",
+    ".rb",
+    ".sh",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".json",
+    ".md",
+    ".txt",
 }
 
 COLLECTION_DOCUMENTS = "documents"
@@ -24,7 +42,9 @@ COLLECTION_CODE = "code"
 COLLECTION_CONVERSATIONS = "conversations"
 
 
-def _chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
+def _chunk_text(
+    text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP
+) -> list[str]:
     chunks = []
     start = 0
     while start < len(text):
@@ -71,13 +91,13 @@ class VectorStore:
 
         embeddings = embedder(chunks)
         ids = [f"{file_id}:{i}" for i in range(len(chunks))]
-        metadatas = [{"source": source, "chunk": i, "file_id": file_id} for i in range(len(chunks))]
+        metadatas = [
+            {"source": source, "chunk": i, "file_id": file_id}
+            for i in range(len(chunks))
+        ]
 
-        # Delete existing chunks for this file before upserting
-        try:
+        with contextlib.suppress(Exception):
             col.delete(where={"file_id": file_id})
-        except Exception:
-            pass
 
         col.add(ids=ids, embeddings=embeddings, documents=chunks, metadatas=metadatas)
         return len(chunks)
@@ -86,7 +106,9 @@ class VectorStore:
     # Code
     # ------------------------------------------------------------------
 
-    def ingest_code_file(self, path: Path, embedder: Any, *, root: Path | None = None) -> int:
+    def ingest_code_file(
+        self, path: Path, embedder: Any, *, root: Path | None = None
+    ) -> int:
         text = path.read_text(errors="replace")
         chunks = _chunk_text(text)
         if not chunks:
@@ -104,10 +126,8 @@ class VectorStore:
             for i in range(len(chunks))
         ]
 
-        try:
+        with contextlib.suppress(Exception):
             col.delete(where={"file_id": file_id})
-        except Exception:
-            pass
 
         col.add(ids=ids, embeddings=embeddings, documents=chunks, metadatas=metadatas)
         return len(chunks)
@@ -168,7 +188,9 @@ class VectorStore:
             return []
         entries = [
             {"id": i, "content": d, **m}
-            for i, d, m in zip(result["ids"], result["documents"], result["metadatas"])
+            for i, d, m in zip(
+                result["ids"], result["documents"], result["metadatas"], strict=False
+            )
         ]
         entries.sort(key=lambda x: x.get("timestamp", 0))
         return entries[-limit:]
@@ -222,6 +244,7 @@ class VectorStore:
                 result["documents"][0],
                 result["metadatas"][0],
                 result["distances"][0],
+                strict=False,
             )
         ]
 

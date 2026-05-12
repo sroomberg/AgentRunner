@@ -2,4 +2,4 @@
 
 from .runner import RunConfig, logs, start, status, stop
 
-__all__ = ["RunConfig", "start", "stop", "status", "logs"]
+__all__ = ["RunConfig", "logs", "start", "status", "stop"]

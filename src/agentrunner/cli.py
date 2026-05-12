@@ -64,7 +64,8 @@ def run(
     detach: Annotated[
         bool,
         typer.Option(
-            "--detach", "-d",
+            "--detach",
+            "-d",
             help="Start container in background; wait for API ready, then return.",
         ),
     ] = False,
@@ -102,7 +103,9 @@ def run(
     docker_cmd = build_docker_run_cmd(config)
 
     if detach:
-        subprocess.Popen(docker_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen(
+            docker_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
         if wait:
             console.print("[dim]Waiting for API to become ready…[/dim]")
             if wait_ready(config):
@@ -156,7 +159,9 @@ def stop_cmd(
             console.print("[yellow]No running AgentRunner containers found.[/yellow]")
             raise typer.Exit(1)
         else:
-            console.print("[red]Multiple containers running — specify --name or use --all:[/red]")
+            console.print(
+                "[red]Multiple containers running — specify --name or use --all:[/red]"
+            )
             for c in running:
                 console.print(f"  {c['name']}")
             raise typer.Exit(1)
@@ -211,7 +216,11 @@ def status_cmd(
         all_healthy = True
         for c in containers:
             info = status(c["name"])
-            api_str = "[green]healthy[/green]" if info["api_healthy"] else "[yellow]unreachable[/yellow]"
+            api_str = (
+                "[green]healthy[/green]"
+                if info["api_healthy"]
+                else "[yellow]unreachable[/yellow]"
+            )
             if not info["api_healthy"]:
                 all_healthy = False
             table.add_row(
@@ -233,7 +242,11 @@ def status_cmd(
     table.add_column("Value")
 
     running_str = "[green]running[/green]" if info["running"] else "[red]stopped[/red]"
-    api_str = "[green]healthy[/green]" if info["api_healthy"] else "[yellow]unreachable[/yellow]"
+    api_str = (
+        "[green]healthy[/green]"
+        if info["api_healthy"]
+        else "[yellow]unreachable[/yellow]"
+    )
 
     table.add_row("Container", running_str)
     table.add_row("API", api_str)
@@ -249,7 +262,9 @@ def status_cmd(
 def logs_cmd(
     name: Annotated[
         str | None,
-        typer.Option("--name", "-n", help="Container name (auto-resolved if only one is running)"),
+        typer.Option(
+            "--name", "-n", help="Container name (auto-resolved if only one is running)"
+        ),
     ] = None,
     follow: Annotated[
         bool,

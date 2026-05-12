@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from agentrunner.sessions.session import Message, Session
 
-
 # ------------------------------------------------------------------
 # Session persistence
 # ------------------------------------------------------------------
+
 
 def test_session_create_and_save(tmp_path: Path) -> None:
     session = Session.create(
@@ -52,7 +52,9 @@ def test_session_roundtrip(tmp_path: Path) -> None:
 
 def test_session_list(tmp_path: Path) -> None:
     for name in ("alpha", "beta", "gamma"):
-        s = Session.create(name, endpoint="http://localhost:8000", model_id="m", db_path=tmp_path)
+        s = Session.create(
+            name, endpoint="http://localhost:8000", model_id="m", db_path=tmp_path
+        )
         s.save(tmp_path)
     sessions = Session.list_all(tmp_path)
     assert len(sessions) == 3
@@ -73,7 +75,9 @@ def test_session_load_missing(tmp_path: Path) -> None:
 
 
 def test_session_clear_history(tmp_path: Path) -> None:
-    session = Session.create("s", endpoint="http://localhost:8000", model_id="m", db_path=tmp_path)
+    session = Session.create(
+        "s", endpoint="http://localhost:8000", model_id="m", db_path=tmp_path
+    )
     session.messages.append(Message(role="user", content="x"))
     session.messages.append(Message(role="assistant", content="y"))
     assert session.message_count() == 2
@@ -82,7 +86,9 @@ def test_session_clear_history(tmp_path: Path) -> None:
 
 
 def test_session_delete(tmp_path: Path) -> None:
-    session = Session.create("bye", endpoint="http://localhost:8000", model_id="m", db_path=tmp_path)
+    session = Session.create(
+        "bye", endpoint="http://localhost:8000", model_id="m", db_path=tmp_path
+    )
     session.save(tmp_path)
     assert (tmp_path / "bye.json").exists()
     session.delete(tmp_path)
@@ -93,8 +99,9 @@ def test_session_delete(tmp_path: Path) -> None:
 # chat() — message assembly
 # ------------------------------------------------------------------
 
-def _fake_urlopen(response_text: str):
-    """Return a patch target that makes urlopen yield *response_text*."""
+
+def _fake_urlopen(response_text: str) -> MagicMock:
+    """Return a context-manager mock that yields *response_text* on .read()."""
     mock_cm = MagicMock()
     mock_cm.__enter__ = lambda s: s
     mock_cm.__exit__ = MagicMock(return_value=False)
@@ -107,21 +114,28 @@ def _completions_response(content: str) -> str:
 
 
 def test_chat_returns_response(tmp_path: Path) -> None:
+    from agentrunner.sessions.chat import chat
+
     session = Session.create(
-        "chat-test", endpoint="http://localhost:8001", model_id="llama3", db_path=tmp_path
+        "chat-test",
+        endpoint="http://localhost:8001",
+        model_id="llama3",
+        db_path=tmp_path,
     )
-    with patch("urllib.request.urlopen", return_value=_fake_urlopen(_completions_response("Hello!"))):
-        from agentrunner.sessions.chat import chat
+    fake = _fake_urlopen(_completions_response("Hello!"))
+    with patch("urllib.request.urlopen", return_value=fake):
         reply = chat(session, "Hi model")
     assert reply == "Hello!"
 
 
 def test_chat_persists_exchange(tmp_path: Path) -> None:
+    from agentrunner.sessions.chat import chat
+
     session = Session.create(
         "persist", endpoint="http://localhost:8001", model_id="llama3", db_path=tmp_path
     )
-    with patch("urllib.request.urlopen", return_value=_fake_urlopen(_completions_response("Pong"))):
-        from agentrunner.sessions.chat import chat
+    fake = _fake_urlopen(_completions_response("Pong"))
+    with patch("urllib.request.urlopen", return_value=fake):
         chat(session, "Ping")
     assert len(session.messages) == 2
     assert session.messages[0] == Message(
@@ -133,6 +147,8 @@ def test_chat_persists_exchange(tmp_path: Path) -> None:
 
 def test_chat_includes_system_prompt(tmp_path: Path) -> None:
     """System prompt must appear as the first message sent to the API."""
+    from agentrunner.sessions.chat import chat
+
     session = Session.create(
         "sysprompt",
         endpoint="http://localhost:8001",
@@ -143,12 +159,10 @@ def test_chat_includes_system_prompt(tmp_path: Path) -> None:
     captured: list[dict] = []
 
     def fake_urlopen(req, timeout=None):
-        body = json.loads(req.data)
-        captured.extend(body["messages"])
+        captured.extend(json.loads(req.data)["messages"])
         return _fake_urlopen(_completions_response("Arrr"))
 
     with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-        from agentrunner.sessions.chat import chat
         chat(session, "Hello")
 
     assert captured[0] == {"role": "system", "content": "You are a pirate."}
@@ -156,7 +170,9 @@ def test_chat_includes_system_prompt(tmp_path: Path) -> None:
 
 
 def test_chat_includes_prior_history(tmp_path: Path) -> None:
-    """Prior conversation history must be included in the request before the new message."""
+    """Prior conversation history must appear in the request before the new message."""
+    from agentrunner.sessions.chat import chat
+
     session = Session.create(
         "history", endpoint="http://localhost:8001", model_id="llama3", db_path=tmp_path
     )
@@ -166,25 +182,21 @@ def test_chat_includes_prior_history(tmp_path: Path) -> None:
     captured: list[dict] = []
 
     def fake_urlopen(req, timeout=None):
-        body = json.loads(req.data)
-        captured.extend(body["messages"])
+        captured.extend(json.loads(req.data)["messages"])
         return _fake_urlopen(_completions_response("second answer"))
 
     with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-        from agentrunner.sessions.chat import chat
         chat(session, "second question")
 
-    roles = [m["role"] for m in captured]
     contents = [m["content"] for m in captured]
     assert "first question" in contents
     assert "first answer" in contents
     assert contents[-1] == "second question"
-    # history comes before the new user message
-    assert roles.index("user") < roles[-1:].count("user") or contents.index("first question") < contents.index("second question")
+    assert contents.index("first question") < contents.index("second question")
 
 
 def test_chat_context_retrieval_injected(tmp_path: Path) -> None:
-    """When embedding_model is set, retrieved context appears as a system message."""
+    """Retrieved context must appear as a system message when embedding_model is set."""
     from agentrunner.sessions.chat import chat as _chat
 
     session = Session.create(
@@ -197,34 +209,41 @@ def test_chat_context_retrieval_injected(tmp_path: Path) -> None:
     captured: list[dict] = []
 
     def fake_urlopen(req, timeout=None):
-        body = json.loads(req.data)
-        captured.extend(body["messages"])
+        captured.extend(json.loads(req.data)["messages"])
         return _fake_urlopen(_completions_response("answer"))
 
     fake_context = "Relevant doc chunk"
 
-    with patch("agentrunner.sessions.chat._retrieve_context", return_value=fake_context):
-        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-            _chat(session, "question")
+    with (
+        patch("agentrunner.sessions.chat._retrieve_context", return_value=fake_context),
+        patch("urllib.request.urlopen", side_effect=fake_urlopen),
+    ):
+        _chat(session, "question")
 
     system_messages = [m["content"] for m in captured if m["role"] == "system"]
     assert any(fake_context in msg for msg in system_messages)
 
 
 def test_chat_context_retrieval_skipped_without_embedding_model(tmp_path: Path) -> None:
-    """No context retrieval attempt when embedding_model is empty."""
+    """_retrieve_context must not be called when embedding_model is empty."""
+    from agentrunner.sessions.chat import chat
+
     session = Session.create(
         "noctx", endpoint="http://localhost:8001", model_id="llama3", db_path=tmp_path
     )
-    with patch("agentrunner.sessions.chat._retrieve_context") as mock_retrieve:
-        with patch("urllib.request.urlopen", return_value=_fake_urlopen(_completions_response("ok"))):
-            from agentrunner.sessions.chat import chat
-            chat(session, "hi")
+    fake = _fake_urlopen(_completions_response("ok"))
+    with (
+        patch("agentrunner.sessions.chat._retrieve_context") as mock_retrieve,
+        patch("urllib.request.urlopen", return_value=fake),
+    ):
+        chat(session, "hi")
     mock_retrieve.assert_not_called()
 
 
 def test_chat_graceful_on_embedding_failure(tmp_path: Path) -> None:
-    """A failing embedding endpoint must not break the chat call."""
+    """A failing embedding endpoint must not prevent the chat call from succeeding."""
+    from agentrunner.sessions.chat import chat
+
     session = Session.create(
         "fail-embed",
         endpoint="http://localhost:8001",
@@ -232,8 +251,10 @@ def test_chat_graceful_on_embedding_failure(tmp_path: Path) -> None:
         db_path=tmp_path / "vectordb",
         embedding_model="llama3",
     )
-    with patch("agentrunner.sessions.chat._retrieve_context", return_value=""):
-        with patch("urllib.request.urlopen", return_value=_fake_urlopen(_completions_response("fine"))):
-            from agentrunner.sessions.chat import chat
-            reply = chat(session, "hi")
+    fake = _fake_urlopen(_completions_response("fine"))
+    with (
+        patch("agentrunner.sessions.chat._retrieve_context", return_value=""),
+        patch("urllib.request.urlopen", return_value=fake),
+    ):
+        reply = chat(session, "hi")
     assert reply == "fine"

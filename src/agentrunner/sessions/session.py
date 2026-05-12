@@ -40,7 +40,9 @@ class Session:
         path.write_text(json.dumps(data, indent=2))
 
     @classmethod
-    def load(cls, session_id: str, sessions_dir: Path = DEFAULT_SESSIONS_DIR) -> Session:
+    def load(
+        cls, session_id: str, sessions_dir: Path = DEFAULT_SESSIONS_DIR
+    ) -> Session:
         path = sessions_dir / f"{session_id}.json"
         if not path.exists():
             raise FileNotFoundError(f"Session '{session_id}' not found.")

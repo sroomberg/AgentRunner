@@ -2,4 +2,4 @@
 
 from .session import Message, Session
 
-__all__ = ["Session", "Message"]
+__all__ = ["Message", "Session"]

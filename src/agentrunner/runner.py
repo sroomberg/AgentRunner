@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import subprocess
@@ -72,7 +73,7 @@ def _wait_ready(endpoint: str, timeout: int = HEALTH_TIMEOUT) -> bool:
 
 
 def _parse_host_port(ports_str: str) -> int | None:
-    """Extract the host port from a Docker Ports string like '0.0.0.0:8001->8000/tcp'."""
+    """Extract the host port from a Ports string like '0.0.0.0:8001->8000/tcp'."""
     m = re.search(r":(\d+)->8000", ports_str)
     return int(m.group(1)) if m else None
 
@@ -91,10 +92,15 @@ def _parse_labels(labels_str: str) -> dict[str, str]:
 def build_docker_run_cmd(config: RunConfig) -> list[str]:
     model_path = config.model_path.resolve()
     cmd = [
-        "docker", "run", "--rm",
-        "--name", config.container_name,
-        "-p", f"{config.port}:8000",
-        "-v", f"{model_path}:/model:ro",
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        config.container_name,
+        "-p",
+        f"{config.port}:8000",
+        "-v",
+        f"{model_path}:/model:ro",
         f"--label={MANAGED_LABEL}=true",
         f"--label={MODEL_LABEL}={config.model_id}",
         f"--label={MODEL_PATH_LABEL}={model_path}",
@@ -103,11 +109,16 @@ def build_docker_run_cmd(config: RunConfig) -> list[str]:
         cmd += ["--gpus", "all"]
     cmd += [
         VLLM_IMAGE,
-        "--model", "/model",
-        "--served-model-name", config.model_id,
-        "--dtype", config.dtype,
-        "--host", "0.0.0.0",
-        "--port", "8000",
+        "--model",
+        "/model",
+        "--served-model-name",
+        config.model_id,
+        "--dtype",
+        config.dtype,
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
     ]
     if config.max_model_len is not None:
         cmd += ["--max-model-len", str(config.max_model_len)]
@@ -149,9 +160,12 @@ def list_containers() -> list[dict]:
     """Return info for all running AgentRunner-managed containers."""
     result = subprocess.run(
         [
-            "docker", "ps",
-            "--filter", f"label={MANAGED_LABEL}=true",
-            "--format", "{{json .}}",
+            "docker",
+            "ps",
+            "--filter",
+            f"label={MANAGED_LABEL}=true",
+            "--format",
+            "{{json .}}",
         ],
         capture_output=True,
         text=True,
@@ -165,14 +179,16 @@ def list_containers() -> list[dict]:
         host_port = _parse_host_port(data.get("Ports", ""))
         model_id = labels.get(MODEL_LABEL, "?")
         model_path = labels.get(MODEL_PATH_LABEL, "?")
-        containers.append({
-            "name": data["Names"],
-            "model_id": model_id,
-            "model_path": model_path,
-            "port": host_port,
-            "endpoint": f"http://localhost:{host_port}" if host_port else "?",
-            "status": data.get("Status", "?"),
-        })
+        containers.append(
+            {
+                "name": data["Names"],
+                "model_id": model_id,
+                "model_path": model_path,
+                "port": host_port,
+                "endpoint": f"http://localhost:{host_port}" if host_port else "?",
+                "status": data.get("Status", "?"),
+            }
+        )
     return containers
 
 
@@ -199,15 +215,12 @@ def status(name: str) -> dict:
         port = 8000
         if port_result.returncode == 0:
             binding = port_result.stdout.strip().split(":")[-1]
-            try:
+            with contextlib.suppress(ValueError):
                 port = int(binding)
-            except ValueError:
-                pass
-        try:
-            with urllib.request.urlopen(f"http://localhost:{port}/v1/models", timeout=3):
+        with contextlib.suppress(Exception):
+            url = f"http://localhost:{port}/v1/models"
+            with urllib.request.urlopen(url, timeout=3):
                 api_healthy = True
-        except Exception:
-            pass
 
     return {"running": running, "api_healthy": api_healthy, "container": state}
 

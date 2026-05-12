@@ -10,7 +10,12 @@ from rich.console import Console
 from rich.table import Table
 
 from .embeddings import embed
-from .store import COLLECTION_CODE, COLLECTION_CONVERSATIONS, COLLECTION_DOCUMENTS, VectorStore
+from .store import (
+    COLLECTION_CODE,
+    COLLECTION_CONVERSATIONS,
+    COLLECTION_DOCUMENTS,
+    VectorStore,
+)
 from .sync import sync_pull, sync_push
 
 db_app = typer.Typer(
@@ -20,13 +25,20 @@ db_app = typer.Typer(
 )
 console = Console()
 
-_DB_PATH_OPT = typer.Option("./vectordb", "--db-path", help="Path to the ChromaDB directory")
-_ENDPOINT_OPT = typer.Option("http://localhost:8000", "--endpoint", "-e", help="vLLM server endpoint")
+_DB_PATH_OPT = typer.Option(
+    "./vectordb", "--db-path", help="Path to the ChromaDB directory"
+)
+_ENDPOINT_OPT = typer.Option(
+    "http://localhost:8000", "--endpoint", "-e", help="vLLM server endpoint"
+)
 _MODEL_OPT = typer.Option(..., "--model", "-m", help="Model ID for embeddings")
 
 
 def _embedder(endpoint: str, model_id: str):
-    return lambda texts: embed(endpoint, model_id, texts)
+    def _embed(texts: list[str]) -> list[list[float]]:
+        return embed(endpoint, model_id, texts)
+
+    return _embed
 
 
 @db_app.command()
@@ -64,7 +76,9 @@ def ingest(
                 n = store.ingest_document(f, embedder)
                 total += n
                 console.print(f"  {f.name}: {n} chunks")
-            console.print(f"[green]Ingested {total} chunks from {len(files)} files.[/green]")
+            console.print(
+                f"[green]Ingested {total} chunks from {len(files)} files.[/green]"
+            )
         else:
             n = store.ingest_document(path, embedder)
             console.print(f"[green]Ingested {n} chunks from {path}.[/green]")
@@ -75,7 +89,11 @@ def search(
     query: Annotated[str, typer.Argument(help="Search query")],
     collection: Annotated[
         str,
-        typer.Option("--collection", "-c", help="Collection to search: documents, code, conversations"),
+        typer.Option(
+            "--collection",
+            "-c",
+            help="Collection to search: documents, code, conversations",
+        ),
     ] = COLLECTION_DOCUMENTS,
     n: Annotated[int, typer.Option("--n", help="Number of results")] = 5,
     session: Annotated[
@@ -87,11 +105,14 @@ def search(
     db_path: Annotated[Path, _DB_PATH_OPT] = Path("./vectordb"),
 ) -> None:
     """Search the vector database for relevant context."""
-    embedder = _embedder(endpoint, model)
     store = VectorStore(db_path)
 
     query_vec = embed(endpoint, model, [query])[0]
-    where = {"session_id": session} if session and collection == COLLECTION_CONVERSATIONS else None
+    where = (
+        {"session_id": session}
+        if session and collection == COLLECTION_CONVERSATIONS
+        else None
+    )
 
     results = store.search(query_vec, collection, n_results=n, where=where)
 
@@ -103,11 +124,17 @@ def search(
         console.rule(f"[bold]Result {i}[/bold] (distance: {r['distance']:.4f})")
         meta = r["metadata"]
         if collection == COLLECTION_CODE:
-            console.print(f"[dim]{meta.get('filepath', '?')} ({meta.get('language', '?')})[/dim]")
+            console.print(
+                f"[dim]{meta.get('filepath', '?')} ({meta.get('language', '?')})[/dim]"
+            )
         elif collection == COLLECTION_DOCUMENTS:
-            console.print(f"[dim]{meta.get('source', '?')} chunk {meta.get('chunk', '?')}[/dim]")
+            console.print(
+                f"[dim]{meta.get('source', '?')} chunk {meta.get('chunk', '?')}[/dim]"
+            )
         elif collection == COLLECTION_CONVERSATIONS:
-            console.print(f"[dim]{meta.get('role', '?')} @ session {meta.get('session_id', '?')}[/dim]")
+            role = meta.get("role", "?")
+            sid = meta.get("session_id", "?")
+            console.print(f"[dim]{role} @ session {sid}[/dim]")
         console.print(r["content"][:500] + ("…" if len(r["content"]) > 500 else ""))
 
 
@@ -130,7 +157,9 @@ def history(
     embedder = _embedder(endpoint, model)
     store = VectorStore(db_path)
     msg_id = store.add_history(session, role, content, embedder)
-    console.print(f"[green]Stored message {msg_id[:8]}… in session '{session}'.[/green]")
+    console.print(
+        f"[green]Stored message {msg_id[:8]}… in session '{session}'.[/green]"
+    )
 
 
 @db_app.command()
@@ -156,7 +185,9 @@ def summarize(
 
 @db_app.command()
 def sync(
-    s3_uri: Annotated[str, typer.Argument(help="S3 URI (e.g. s3://my-bucket/vectordb)")],
+    s3_uri: Annotated[
+        str, typer.Argument(help="S3 URI (e.g. s3://my-bucket/vectordb)")
+    ],
     direction: Annotated[
         str,
         typer.Option("--direction", help="push (local → S3) or pull (S3 → local)"),
@@ -173,7 +204,9 @@ def sync(
         sync_pull(s3_uri, db_path)
         console.print("[green]Pull complete.[/green]")
     else:
-        console.print(f"[red]Unknown direction '{direction}'. Use 'push' or 'pull'.[/red]")
+        console.print(
+            f"[red]Unknown direction '{direction}'. Use 'push' or 'pull'.[/red]"
+        )
         raise typer.Exit(1)
 
 

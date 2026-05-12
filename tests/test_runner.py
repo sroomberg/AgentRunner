@@ -90,6 +90,8 @@ def test_wait_ready_success() -> None:
 
 
 def test_wait_ready_timeout() -> None:
-    with patch("urllib.request.urlopen", side_effect=OSError("refused")):
-        with patch("time.sleep"):
-            assert not _wait_ready("http://localhost:8000", timeout=1)
+    with (
+        patch("urllib.request.urlopen", side_effect=OSError("refused")),
+        patch("time.sleep"),
+    ):
+        assert not _wait_ready("http://localhost:8000", timeout=1)

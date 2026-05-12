@@ -23,10 +23,14 @@ session_app = typer.Typer(
 console = Console()
 
 _SESSIONS_DIR_OPT = typer.Option(
-    None, "--sessions-dir", help="Sessions directory (default: ~/.agentrunner/sessions)"
+    None,
+    "--sessions-dir",
+    help="Sessions directory (default: ~/.agentrunner/sessions)",
 )
 _DB_PATH_OPT = typer.Option(
-    None, "--db-path", help="Context vector store path (default: <sessions-dir>/<id>/vectordb)"
+    None,
+    "--db-path",
+    help="Context vector store path (default: <sessions-dir>/<id>/vectordb)",
 )
 
 
@@ -72,16 +76,25 @@ def _resolve_endpoint_and_model(
 # Commands
 # ------------------------------------------------------------------
 
+
 @session_app.command()
 def create(
     session_id: Annotated[str, typer.Argument(help="Unique session name/ID")],
     container: Annotated[
         str | None,
-        typer.Option("--container", "-c", help="Container name to bind to (auto-resolved if one is running)"),
+        typer.Option(
+            "--container",
+            "-c",
+            help="Container name to bind to (auto-resolved if one is running)",
+        ),
     ] = None,
     endpoint: Annotated[
         str | None,
-        typer.Option("--endpoint", "-e", help="vLLM endpoint override (e.g. http://localhost:8001)"),
+        typer.Option(
+            "--endpoint",
+            "-e",
+            help="vLLM endpoint override (e.g. http://localhost:8001)",
+        ),
     ] = None,
     model: Annotated[
         str | None,
@@ -89,7 +102,9 @@ def create(
     ] = None,
     system_prompt: Annotated[
         str,
-        typer.Option("--system-prompt", "-s", help="System prompt prepended to every request"),
+        typer.Option(
+            "--system-prompt", "-s", help="System prompt prepended to every request"
+        ),
     ] = "",
     embedding_model: Annotated[
         str,
@@ -129,7 +144,8 @@ def create(
     if embedding_model:
         console.print(f"  Embeddings: {embedding_model}")
     if system_prompt:
-        console.print(f"  System:    {system_prompt[:60]}{'…' if len(system_prompt) > 60 else ''}")
+        truncated = system_prompt[:60] + ("…" if len(system_prompt) > 60 else "")
+        console.print(f"  System:    {truncated}")
 
 
 @session_app.command(name="list")
@@ -212,11 +228,13 @@ def attach(
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(1) from e
 
+    ctx_status = "on" if session.embedding_model else "off"
     console.print(
         Panel(
-            f"[bold]{session.id}[/bold]  ·  model [cyan]{session.model_id}[/cyan]  ·  {session.endpoint}\n"
+            f"[bold]{session.id}[/bold]  ·  "
+            f"model [cyan]{session.model_id}[/cyan]  ·  {session.endpoint}\n"
             f"[dim]{session.message_count()} messages in history  ·  "
-            f"context retrieval {'on' if session.embedding_model else 'off'}[/dim]\n"
+            f"context retrieval {ctx_status}[/dim]\n"
             "[dim]/history  /context <q>  /reset  /exit[/dim]",
             title="AgentRunner Session",
         )
@@ -246,7 +264,7 @@ def attach(
             continue
 
         if user_input.startswith("/context "):
-            query = user_input[len("/context "):].strip()
+            query = user_input[len("/context ") :].strip()
             ctx = retrieve_context(session, query, n_context)
             if ctx:
                 console.print(Panel(ctx, title="Retrieved context"))
@@ -259,7 +277,9 @@ def attach(
             continue
 
         try:
-            response = chat(session, user_input, n_context=n_context, max_tokens=max_tokens)
+            response = chat(
+                session, user_input, n_context=n_context, max_tokens=max_tokens
+            )
         except Exception as e:
             console.print(f"[red]Error: {e}[/red]")
             continue
@@ -306,7 +326,9 @@ def clear(
     count = session.message_count()
     session.clear_history()
     session.save(sdir)
-    console.print(f"[green]Cleared {count} messages from session '{session_id}'.[/green]")
+    console.print(
+        f"[green]Cleared {count} messages from session '{session_id}'.[/green]"
+    )
 
 
 @session_app.command()
@@ -329,6 +351,7 @@ def delete(
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
 
 def _print_history(session: Session, last: int | None = None) -> None:
     messages = session.messages
