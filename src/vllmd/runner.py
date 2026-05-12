@@ -31,12 +31,25 @@ class RunConfig:
     extra_args: list[str] = field(default_factory=list)
 
     @property
+    def is_hub_model(self) -> bool:
+        """True when model_path looks like an HF repo ID (org/name, no local dir)."""
+        return "/" in str(self.model_path) and not self.model_path.exists()
+
+    @property
     def model_id(self) -> str:
+        if self.is_hub_model:
+            return str(self.model_path)
         return self.model_path.resolve().name
 
     @property
     def container_name(self) -> str:
-        return self.name or f"vllmd-{self.model_id}"
+        if self.name:
+            return self.name
+        if self.is_hub_model:
+            safe = str(self.model_path).replace("/", "-")
+        else:
+            safe = self.model_path.resolve().name
+        return f"vllmd-{safe}"
 
     @property
     def endpoint(self) -> str:
@@ -101,7 +114,6 @@ def _parse_labels(labels_str: str) -> dict[str, str]:
 
 
 def build_docker_run_cmd(config: RunConfig) -> list[str]:
-    model_path = config.model_path.resolve()
     cmd = [
         "docker",
         "run",
@@ -110,12 +122,21 @@ def build_docker_run_cmd(config: RunConfig) -> list[str]:
         config.container_name,
         "-p",
         f"{config.port}:8000",
-        "-v",
-        f"{model_path}:/model:ro",
         f"--label={MANAGED_LABEL}=true",
         f"--label={MODEL_LABEL}={config.model_id}",
-        f"--label={MODEL_PATH_LABEL}={model_path}",
     ]
+
+    if config.is_hub_model:
+        hf_cache = Path.home() / ".cache" / "huggingface"
+        cmd += ["-v", f"{hf_cache}:/root/.cache/huggingface"]
+        model_arg = config.model_id
+        cmd += [f"--label={MODEL_PATH_LABEL}={config.model_id}"]
+    else:
+        model_path = config.model_path.resolve()
+        cmd += ["-v", f"{model_path}:/model:ro"]
+        model_arg = "/model"
+        cmd += [f"--label={MODEL_PATH_LABEL}={model_path}"]
+
     if config.lora_path is not None:
         lora_abs = config.lora_path.resolve()
         cmd += ["-v", f"{lora_abs}:/lora:ro"]
@@ -124,7 +145,7 @@ def build_docker_run_cmd(config: RunConfig) -> list[str]:
     cmd += [
         VLLM_IMAGE,
         "--model",
-        "/model",
+        model_arg,
         "--served-model-name",
         config.model_id,
         "--dtype",
@@ -147,9 +168,10 @@ def build_docker_run_cmd(config: RunConfig) -> list[str]:
 
 def start(config: RunConfig) -> None:
     """Start a vLLM container (foreground, blocking)."""
-    model_path = config.model_path.resolve()
-    if not model_path.exists():
-        raise FileNotFoundError(f"Model path not found: {model_path}")
+    if not config.is_hub_model:
+        model_path = config.model_path.resolve()
+        if not model_path.exists():
+            raise FileNotFoundError(f"Model path not found: {model_path}")
     if _container_exists(config.container_name):
         raise RuntimeError(
             f"Container '{config.container_name}' already exists. "

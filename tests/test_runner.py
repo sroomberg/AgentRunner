@@ -40,6 +40,58 @@ def test_run_config_endpoint() -> None:
     assert cfg.endpoint == "http://localhost:9001"
 
 
+def test_is_hub_model_true() -> None:
+    cfg = RunConfig(model_path=Path("meta-llama/Llama-3-8B"))
+    assert cfg.is_hub_model is True
+
+
+def test_is_hub_model_false_local(tmp_path: Path) -> None:
+    model_dir = tmp_path / "my-model"
+    model_dir.mkdir()
+    cfg = RunConfig(model_path=model_dir)
+    assert cfg.is_hub_model is False
+
+
+def test_hub_model_id() -> None:
+    cfg = RunConfig(model_path=Path("meta-llama/Llama-3-8B"))
+    assert cfg.model_id == "meta-llama/Llama-3-8B"
+
+
+def test_hub_model_container_name() -> None:
+    cfg = RunConfig(model_path=Path("meta-llama/Llama-3-8B"))
+    assert cfg.container_name == "vllmd-meta-llama-Llama-3-8B"
+
+
+def test_hub_model_container_name_explicit() -> None:
+    cfg = RunConfig(model_path=Path("meta-llama/Llama-3-8B"), name="my-llama")
+    assert cfg.container_name == "my-llama"
+
+
+def test_build_docker_run_cmd_hub_model() -> None:
+    cfg = RunConfig(model_path=Path("meta-llama/Llama-3-8B"), port=8000, gpu=False)
+    cmd = build_docker_run_cmd(cfg)
+    # Should NOT mount a local model directory
+    assert "/model:ro" not in " ".join(cmd)
+    # Should mount HF cache
+    assert "/root/.cache/huggingface" in " ".join(cmd)
+    # --model should be the hub ID, not /model
+    model_idx = cmd.index("--model")
+    assert cmd[model_idx + 1] == "meta-llama/Llama-3-8B"
+    # --served-model-name should be the full ID
+    served_idx = cmd.index("--served-model-name")
+    assert cmd[served_idx + 1] == "meta-llama/Llama-3-8B"
+
+
+def test_build_docker_run_cmd_local_model_unchanged(tmp_path: Path) -> None:
+    model_dir = tmp_path / "llama3"
+    model_dir.mkdir()
+    cfg = RunConfig(model_path=model_dir, port=8000, gpu=False)
+    cmd = build_docker_run_cmd(cfg)
+    assert "/model:ro" in " ".join(cmd)
+    model_idx = cmd.index("--model")
+    assert cmd[model_idx + 1] == "/model"
+
+
 def test_build_docker_run_cmd_includes_label(tmp_path: Path) -> None:
     model_dir = tmp_path / "llama3"
     model_dir.mkdir()

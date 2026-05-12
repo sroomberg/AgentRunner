@@ -109,10 +109,12 @@ def run(
         extra_args=extra or [],
     )
 
-    model_path = model.resolve()
     console.print(f"[bold]Starting vLLM container[/bold] '{config.container_name}'")
-    console.print(f"  Model:    {model_path}")
-    console.print(f"  Model ID: {config.model_id}")
+    if config.is_hub_model:
+        console.print(f"  Model:    {config.model_id} [dim](HuggingFace Hub)[/dim]")
+    else:
+        console.print(f"  Model:    {model.resolve()}")
+        console.print(f"  Model ID: {config.model_id}")
     console.print(f"  Port:     {port}")
     console.print(f"  GPU:      {'yes' if gpu else 'no'}")
     if lora is not None:
