@@ -67,6 +67,7 @@ def run(
         typer.Option(
             "--detach",
             "-d",
+            is_flag=True,
             help="Start container in background; wait for API ready, then return.",
         ),
     ] = False,
@@ -143,7 +144,9 @@ def stop_cmd(
     ] = None,
     all_containers: Annotated[
         bool,
-        typer.Option("--all", "-a", help="Stop all vllmd-managed containers"),
+        typer.Option(
+            "--all", "-a", is_flag=True, help="Stop all vllmd-managed containers"
+        ),
     ] = False,
 ) -> None:
     """Stop one or all vllmd containers."""
@@ -266,7 +269,7 @@ def logs_cmd(
     ] = None,
     follow: Annotated[
         bool,
-        typer.Option("--follow", "-f", help="Follow log output"),
+        typer.Option("--follow", "-f", is_flag=True, help="Follow log output"),
     ] = False,
 ) -> None:
     """Print logs from a vllmd container."""
