@@ -146,6 +146,16 @@ def stop(name: str) -> None:
     _docker("stop", name)
 
 
+def stop_by_port(port: int) -> str:
+    """Stop the container serving on *port*. Returns the container name."""
+    containers = list_containers()
+    match = next((c for c in containers if c["port"] == port), None)
+    if not match:
+        raise RuntimeError(f"No running vllmd container found on port {port}.")
+    _docker("stop", match["name"])
+    return match["name"]
+
+
 def stop_all() -> list[str]:
     """Stop all vllmd-managed containers. Returns list of stopped names."""
     containers = list_containers()

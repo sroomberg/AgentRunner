@@ -18,6 +18,7 @@ from .runner import (
     status,
     stop,
     stop_all,
+    stop_by_port,
     wait_ready,
 )
 from .sessions.cli import session_app
@@ -136,6 +137,10 @@ def stop_cmd(
         str | None,
         typer.Option("--name", "-n", help="Container name to stop"),
     ] = None,
+    port: Annotated[
+        int | None,
+        typer.Option("--port", "-p", help="Port of the container to stop"),
+    ] = None,
     all_containers: Annotated[
         bool,
         typer.Option("--all", "-a", help="Stop all vllmd-managed containers"),
@@ -151,24 +156,17 @@ def stop_cmd(
             console.print("[yellow]No running vllmd containers found.[/yellow]")
         return
 
-    if name is None:
-        running = list_containers()
-        if len(running) == 1:
-            name = running[0]["name"]
-        elif len(running) == 0:
-            console.print("[yellow]No running vllmd containers found.[/yellow]")
-            raise typer.Exit(1)
-        else:
-            console.print(
-                "[red]Multiple containers running — specify --name or use --all:[/red]"
-            )
-            for c in running:
-                console.print(f"  {c['name']}")
-            raise typer.Exit(1)
+    if name is None and port is None:
+        console.print("[red]Specify --name, --port, or --all.[/red]")
+        raise typer.Exit(1)
 
     try:
-        stop(name)
-        console.print(f"[green]Stopped '{name}'.[/green]")
+        if port is not None:
+            stopped_name = stop_by_port(port)
+            console.print(f"[green]Stopped '{stopped_name}'.[/green]")
+        else:
+            stop(name)  # type: ignore[arg-type]
+            console.print(f"[green]Stopped '{name}'.[/green]")
     except RuntimeError as e:
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(1) from e
