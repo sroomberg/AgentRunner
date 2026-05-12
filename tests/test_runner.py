@@ -1,11 +1,11 @@
-"""Unit tests for vllmctl.runner (no Docker required)."""
+"""Unit tests for vllmd.runner (no Docker required)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from vllmctl.runner import (
+from vllmd.runner import (
     MANAGED_LABEL,
     MODEL_LABEL,
     RunConfig,
@@ -28,7 +28,7 @@ def test_run_config_container_name_default(tmp_path: Path) -> None:
     model_dir = tmp_path / "my-model"
     model_dir.mkdir()
     cfg = RunConfig(model_path=model_dir)
-    assert cfg.container_name == "vllmctl-my-model"
+    assert cfg.container_name == "vllmd-my-model"
 
 
 def test_run_config_container_name_explicit() -> None:
@@ -65,21 +65,21 @@ def test_parse_host_port() -> None:
 
 
 def test_parse_labels() -> None:
-    labels = _parse_labels("com.vllmctl.managed=true,com.vllmctl.model=llama3")
-    assert labels["com.vllmctl.managed"] == "true"
-    assert labels["com.vllmctl.model"] == "llama3"
+    labels = _parse_labels("com.vllmd.managed=true,com.vllmd.model=llama3")
+    assert labels["com.vllmd.managed"] == "true"
+    assert labels["com.vllmd.model"] == "llama3"
 
 
 def test_container_exists_false() -> None:
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0, stdout="other-container\n")
-        assert not _container_exists("vllmctl-llama3")
+        assert not _container_exists("vllmd-llama3")
 
 
 def test_container_exists_true() -> None:
     with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stdout="vllmctl-llama3\n")
-        assert _container_exists("vllmctl-llama3")
+        mock_run.return_value = MagicMock(returncode=0, stdout="vllmd-llama3\n")
+        assert _container_exists("vllmd-llama3")
 
 
 def test_wait_ready_success() -> None:

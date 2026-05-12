@@ -15,9 +15,9 @@ VLLM_IMAGE = "vllm/vllm-openai:latest"
 HEALTH_TIMEOUT = 300
 HEALTH_INTERVAL = 3
 
-MANAGED_LABEL = "com.vllmctl.managed"
-MODEL_LABEL = "com.vllmctl.model"
-MODEL_PATH_LABEL = "com.vllmctl.model_path"
+MANAGED_LABEL = "com.vllmd.managed"
+MODEL_LABEL = "com.vllmd.model"
+MODEL_PATH_LABEL = "com.vllmd.model_path"
 
 
 @dataclass
@@ -36,7 +36,7 @@ class RunConfig:
 
     @property
     def container_name(self) -> str:
-        return self.name or f"vllmctl-{self.model_id}"
+        return self.name or f"vllmd-{self.model_id}"
 
     @property
     def endpoint(self) -> str:
@@ -147,7 +147,7 @@ def stop(name: str) -> None:
 
 
 def stop_all() -> list[str]:
-    """Stop all vllmctl-managed containers. Returns list of stopped names."""
+    """Stop all vllmd-managed containers. Returns list of stopped names."""
     containers = list_containers()
     stopped = []
     for c in containers:
@@ -157,7 +157,7 @@ def stop_all() -> list[str]:
 
 
 def list_containers() -> list[dict]:
-    """Return info for all running vllmctl-managed containers."""
+    """Return info for all running vllmd-managed containers."""
     result = subprocess.run(
         [
             "docker",

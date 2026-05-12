@@ -1,4 +1,4 @@
-"""vllmctl — run local models via vLLM in Docker containers."""
+"""vllmd — run local models via vLLM in Docker containers."""
 
 from .runner import RunConfig, logs, start, status, stop
 

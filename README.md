@@ -1,4 +1,4 @@
-# vllmctl
+# vllmd
 
 > **⚠️ Experimental** — This project is under active development. APIs, config format, and CLI flags may change without notice.
 
@@ -16,54 +16,54 @@ Requires Docker with the [NVIDIA Container Toolkit](https://docs.nvidia.com/data
 
 ```bash
 # Serve a model on port 8000 (foreground — streams vLLM logs until Ctrl+C)
-vllmctl run --model /path/to/my-model --port 8000
+vllmd run --model /path/to/my-model --port 8000
 
 # Run in the background; wait for the API to be ready, then return
-vllmctl run --model /path/to/my-model --port 8000 -d
+vllmd run --model /path/to/my-model --port 8000 -d
 
 # Run in the background and return immediately without waiting
-vllmctl run --model /path/to/my-model --port 8000 -d --no-wait
+vllmd run --model /path/to/my-model --port 8000 -d --no-wait
 
 # CPU-only (no GPU)
-vllmctl run --model /path/to/my-model --port 8000 --no-gpu
+vllmd run --model /path/to/my-model --port 8000 --no-gpu
 
 # Check if the container is up and the API is healthy
-vllmctl status
+vllmd status
 
 # Stream container logs
-vllmctl logs --follow
+vllmd logs --follow
 
 # Stop the container
-vllmctl stop
+vllmd stop
 ```
 
 ## Multiple Models
 
-Multiple models can run concurrently, each in its own container on a different port. The container name defaults to `vllmctl-<model-dir-name>`.
+Multiple models can run concurrently, each in its own container on a different port. The container name defaults to `vllmd-<model-dir-name>`.
 
 ```bash
 # Start two models on different ports
-vllmctl run --model /models/llama3 --port 8001 -d
-vllmctl run --model /models/mistral --port 8002 -d
+vllmd run --model /models/llama3 --port 8001 -d
+vllmd run --model /models/mistral --port 8002 -d
 
-# List all running vllmctl containers
-vllmctl ps
+# List all running vllmd containers
+vllmd ps
 
 # Check health of all containers at once
-vllmctl status
+vllmd status
 
 # Stop a specific container
-vllmctl stop --name vllmctl-llama3
+vllmd stop --name vllmd-llama3
 
-# Stop all vllmctl containers
-vllmctl stop --all
+# Stop all vllmd containers
+vllmd stop --all
 ```
 
 When only one container is running, `stop`, `status`, `logs`, and `session create` all auto-resolve to it without needing `--name`.
 
 ## How It Works
 
-1. `vllmctl run` resolves the model path and pulls `vllm/vllm-openai:latest` if needed
+1. `vllmd run` resolves the model path and pulls `vllm/vllm-openai:latest` if needed
 2. A Docker container is started with the model directory mounted read-only at `/model`
 3. vLLM serves the model on port 8000 inside the container, mapped to `--port` on the host
 4. The served model ID is the directory name of the model path
@@ -74,7 +74,7 @@ When only one container is running, `stop`, `status`, `logs`, and `session creat
 | Command | Description |
 |---------|-------------|
 | `run` | Start a vLLM container for a model |
-| `ps` | List all running vllmctl containers |
+| `ps` | List all running vllmd containers |
 | `stop` | Stop a container (`--all` to stop every managed container) |
 | `status` | Show container and API health (all containers if no `--name`) |
 | `logs` | Print container logs |
@@ -100,7 +100,7 @@ When only one container is running, `stop`, `status`, `logs`, and `session creat
 |------|---------|-------------|
 | `--model`, `-m` | (required) | Path to the model directory |
 | `--port`, `-p` | `8000` | Host port for the vLLM API |
-| `--name`, `-n` | `vllmctl-<model-dir>` | Docker container name |
+| `--name`, `-n` | `vllmd-<model-dir>` | Docker container name |
 | `--gpu/--no-gpu` | `--gpu` | Enable/disable GPU passthrough |
 | `--dtype` | `auto` | Model dtype (`auto`, `float16`, `bfloat16`, `float32`) |
 | `--max-model-len` | — | Override max context length |
@@ -113,35 +113,35 @@ Extra positional arguments are forwarded verbatim to vLLM.
 
 Sessions are persistent, named conversations tied to a running model. Each session maintains sequential conversation history and optionally retrieves semantic context from the vector database.
 
-Sessions are stored as JSON files in `~/.vllmctl/sessions/` (override with `--sessions-dir`).
+Sessions are stored as JSON files in `~/.vllmd/sessions/` (override with `--sessions-dir`).
 
 ```bash
 # Create a session (auto-resolves endpoint if one container is running)
-vllmctl session create my-session
+vllmd session create my-session
 
 # Create a session bound to a specific container, with context retrieval
-vllmctl session create my-session \
-  --container vllmctl-llama3 \
+vllmd session create my-session \
+  --container vllmd-llama3 \
   --embedding-model llama3 \
   --system-prompt "You are a helpful coding assistant."
 
 # One-shot message
-vllmctl session chat my-session "Explain the main training loop"
+vllmd session chat my-session "Explain the main training loop"
 
 # Interactive REPL (supports /history, /context <query>, /reset, /exit)
-vllmctl session attach my-session
+vllmd session attach my-session
 
 # View conversation history
-vllmctl session history my-session --last 10
+vllmd session history my-session --last 10
 
 # List all sessions
-vllmctl session list
+vllmd session list
 
 # Clear history (keeps session config)
-vllmctl session clear my-session
+vllmd session clear my-session
 
 # Delete a session
-vllmctl session delete my-session
+vllmd session delete my-session
 ```
 
 ### Context retrieval
@@ -152,32 +152,32 @@ If the embedding endpoint is unavailable, retrieval is silently skipped and the 
 
 ## Vector Context Database
 
-vllmctl includes a local vector database (backed by [ChromaDB](https://docs.trychroma.com/)) that stores documents, code, and conversation history as embeddings. Embeddings are generated using the same vLLM server the model runs on.
+vllmd includes a local vector database (backed by [ChromaDB](https://docs.trychroma.com/)) that stores documents, code, and conversation history as embeddings. Embeddings are generated using the same vLLM server the model runs on.
 
 ```bash
 # Ingest a directory of documents
-vllmctl db ingest ./docs --type documents --model my-model
+vllmd db ingest ./docs --type documents --model my-model
 
 # Ingest a codebase
-vllmctl db ingest ./src --type code --model my-model
+vllmd db ingest ./src --type code --model my-model
 
 # Search for relevant context
-vllmctl db search "how does auth work" --collection code --model my-model
+vllmd db search "how does auth work" --collection code --model my-model
 
 # Store a conversation message
-vllmctl db history "Explain the main loop" --role user --session my-session --model my-model
+vllmd db history "Explain the main loop" --role user --session my-session --model my-model
 
 # Abridge old history with a summary
-vllmctl db summarize --session my-session "Previous conversation covered auth and the main loop." --model my-model
+vllmd db summarize --session my-session "Previous conversation covered auth and the main loop." --model my-model
 
 # Push DB to S3
-vllmctl db sync s3://my-bucket/vectordb --direction push
+vllmd db sync s3://my-bucket/vectordb --direction push
 
 # Pull DB from S3
-vllmctl db sync s3://my-bucket/vectordb --direction pull
+vllmd db sync s3://my-bucket/vectordb --direction pull
 
 # Show collection sizes
-vllmctl db stats
+vllmd db stats
 ```
 
 The DB directory (`./vectordb` by default, override with `--db-path`) can be mounted as a Docker volume for persistence and shared across machines via S3 sync.
@@ -219,5 +219,5 @@ pytest
 ## Docker
 
 ```bash
-MODEL_PATH=/path/to/my-model docker compose run --rm vllmctl run --model /model --port 8000
+MODEL_PATH=/path/to/my-model docker compose run --rm vllmd run --model /model --port 8000
 ```

@@ -25,7 +25,7 @@ console = Console()
 _SESSIONS_DIR_OPT = typer.Option(
     None,
     "--sessions-dir",
-    help="Sessions directory (default: ~/.vllmctl/sessions)",
+    help="Sessions directory (default: ~/.vllmd/sessions)",
 )
 _DB_PATH_OPT = typer.Option(
     None,
@@ -61,8 +61,8 @@ def _resolve_endpoint_and_model(
 
     if not containers:
         raise RuntimeError(
-            "No running vllmctl containers found. "
-            "Start one with `vllmctl run`, or pass --endpoint and --model."
+            "No running vllmd containers found. "
+            "Start one with `vllmd run`, or pass --endpoint and --model."
         )
 
     names = ", ".join(c["name"] for c in containers)
@@ -236,7 +236,7 @@ def attach(
             f"[dim]{session.message_count()} messages in history  ·  "
             f"context retrieval {ctx_status}[/dim]\n"
             "[dim]/history  /context <q>  /reset  /exit[/dim]",
-            title="vllmctl Session",
+            title="vllmd Session",
         )
     )
 

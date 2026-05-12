@@ -1,4 +1,4 @@
-"""Unit tests for vllmctl.sessions (no network required)."""
+"""Unit tests for vllmd.sessions (no network required)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vllmctl.sessions.session import Message, Session
+from vllmd.sessions.session import Message, Session
 
 # ------------------------------------------------------------------
 # Session persistence
@@ -114,7 +114,7 @@ def _completions_response(content: str) -> str:
 
 
 def test_chat_returns_response(tmp_path: Path) -> None:
-    from vllmctl.sessions.chat import chat
+    from vllmd.sessions.chat import chat
 
     session = Session.create(
         "chat-test",
@@ -129,7 +129,7 @@ def test_chat_returns_response(tmp_path: Path) -> None:
 
 
 def test_chat_persists_exchange(tmp_path: Path) -> None:
-    from vllmctl.sessions.chat import chat
+    from vllmd.sessions.chat import chat
 
     session = Session.create(
         "persist", endpoint="http://localhost:8001", model_id="llama3", db_path=tmp_path
@@ -147,7 +147,7 @@ def test_chat_persists_exchange(tmp_path: Path) -> None:
 
 def test_chat_includes_system_prompt(tmp_path: Path) -> None:
     """System prompt must appear as the first message sent to the API."""
-    from vllmctl.sessions.chat import chat
+    from vllmd.sessions.chat import chat
 
     session = Session.create(
         "sysprompt",
@@ -171,7 +171,7 @@ def test_chat_includes_system_prompt(tmp_path: Path) -> None:
 
 def test_chat_includes_prior_history(tmp_path: Path) -> None:
     """Prior conversation history must appear in the request before the new message."""
-    from vllmctl.sessions.chat import chat
+    from vllmd.sessions.chat import chat
 
     session = Session.create(
         "history", endpoint="http://localhost:8001", model_id="llama3", db_path=tmp_path
@@ -197,7 +197,7 @@ def test_chat_includes_prior_history(tmp_path: Path) -> None:
 
 def test_chat_context_retrieval_injected(tmp_path: Path) -> None:
     """Retrieved context must appear as a system message when embedding_model is set."""
-    from vllmctl.sessions.chat import chat as _chat
+    from vllmd.sessions.chat import chat as _chat
 
     session = Session.create(
         "ctx",
@@ -215,7 +215,7 @@ def test_chat_context_retrieval_injected(tmp_path: Path) -> None:
     fake_context = "Relevant doc chunk"
 
     with (
-        patch("vllmctl.sessions.chat._retrieve_context", return_value=fake_context),
+        patch("vllmd.sessions.chat._retrieve_context", return_value=fake_context),
         patch("urllib.request.urlopen", side_effect=fake_urlopen),
     ):
         _chat(session, "question")
@@ -226,14 +226,14 @@ def test_chat_context_retrieval_injected(tmp_path: Path) -> None:
 
 def test_chat_context_retrieval_skipped_without_embedding_model(tmp_path: Path) -> None:
     """_retrieve_context must not be called when embedding_model is empty."""
-    from vllmctl.sessions.chat import chat
+    from vllmd.sessions.chat import chat
 
     session = Session.create(
         "noctx", endpoint="http://localhost:8001", model_id="llama3", db_path=tmp_path
     )
     fake = _fake_urlopen(_completions_response("ok"))
     with (
-        patch("vllmctl.sessions.chat._retrieve_context") as mock_retrieve,
+        patch("vllmd.sessions.chat._retrieve_context") as mock_retrieve,
         patch("urllib.request.urlopen", return_value=fake),
     ):
         chat(session, "hi")
@@ -242,7 +242,7 @@ def test_chat_context_retrieval_skipped_without_embedding_model(tmp_path: Path) 
 
 def test_chat_graceful_on_embedding_failure(tmp_path: Path) -> None:
     """A failing embedding endpoint must not prevent the chat call from succeeding."""
-    from vllmctl.sessions.chat import chat
+    from vllmd.sessions.chat import chat
 
     session = Session.create(
         "fail-embed",
@@ -253,7 +253,7 @@ def test_chat_graceful_on_embedding_failure(tmp_path: Path) -> None:
     )
     fake = _fake_urlopen(_completions_response("fine"))
     with (
-        patch("vllmctl.sessions.chat._retrieve_context", return_value=""),
+        patch("vllmd.sessions.chat._retrieve_context", return_value=""),
         patch("urllib.request.urlopen", return_value=fake),
     ):
         reply = chat(session, "hi")

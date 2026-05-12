@@ -2142,7 +2142,7 @@ wheels = [
 ]
 
 [[package]]
-name = "vllmctl"
+name = "vllmd"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
