@@ -8,6 +8,7 @@ from vllmd.runner import (
     MODEL_LABEL,
     RunConfig,
     _container_exists,
+    _detect_lora_rank,
     _parse_host_port,
     _parse_labels,
     _wait_ready,
@@ -93,3 +94,62 @@ def test_wait_ready_timeout() -> None:
         patch("time.sleep"),
     ):
         assert not _wait_ready("http://localhost:8000", timeout=1)
+
+
+def test_detect_lora_rank_from_config(tmp_path: Path) -> None:
+    adapter_dir = tmp_path / "my-adapter"
+    adapter_dir.mkdir()
+    (adapter_dir / "adapter_config.json").write_text('{"r": 16, "lora_alpha": 32}')
+    assert _detect_lora_rank(adapter_dir) == 16
+
+
+def test_detect_lora_rank_missing_file(tmp_path: Path) -> None:
+    adapter_dir = tmp_path / "my-adapter"
+    adapter_dir.mkdir()
+    assert _detect_lora_rank(adapter_dir) is None
+
+
+def test_detect_lora_rank_invalid_json(tmp_path: Path) -> None:
+    adapter_dir = tmp_path / "my-adapter"
+    adapter_dir.mkdir()
+    (adapter_dir / "adapter_config.json").write_text("not json")
+    assert _detect_lora_rank(adapter_dir) is None
+
+
+def test_build_docker_run_cmd_with_lora(tmp_path: Path) -> None:
+    model_dir = tmp_path / "llama3"
+    model_dir.mkdir()
+    lora_dir = tmp_path / "my-adapter"
+    lora_dir.mkdir()
+    cfg = RunConfig(
+        model_path=model_dir, port=8000, lora_path=lora_dir, max_lora_rank=16
+    )
+    cmd = build_docker_run_cmd(cfg)
+    assert "-v" in cmd
+    lora_mount = f"{lora_dir.resolve()}:/lora:ro"
+    assert lora_mount in cmd
+    assert "--enable-lora" in cmd
+    assert "--lora-modules" in cmd
+    assert "my-adapter=/lora" in cmd
+    assert "--max-lora-rank" in cmd
+    assert "16" in cmd
+
+
+def test_build_docker_run_cmd_with_lora_no_rank(tmp_path: Path) -> None:
+    model_dir = tmp_path / "llama3"
+    model_dir.mkdir()
+    lora_dir = tmp_path / "my-adapter"
+    lora_dir.mkdir()
+    cfg = RunConfig(model_path=model_dir, port=8000, lora_path=lora_dir)
+    cmd = build_docker_run_cmd(cfg)
+    assert "--enable-lora" in cmd
+    assert "--max-lora-rank" not in cmd
+
+
+def test_build_docker_run_cmd_without_lora(tmp_path: Path) -> None:
+    model_dir = tmp_path / "llama3"
+    model_dir.mkdir()
+    cfg = RunConfig(model_path=model_dir, port=8000)
+    cmd = build_docker_run_cmd(cfg)
+    assert "--enable-lora" not in cmd
+    assert "--lora-modules" not in cmd

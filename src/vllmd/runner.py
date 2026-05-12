@@ -26,6 +26,8 @@ class RunConfig:
     gpu: bool = True
     dtype: str = "auto"
     max_model_len: int | None = None
+    lora_path: Path | None = None
+    max_lora_rank: int | None = None
     extra_args: list[str] = field(default_factory=list)
 
     @property
@@ -76,6 +78,17 @@ def _parse_host_port(ports_str: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
+def _detect_lora_rank(lora_path: Path) -> int | None:
+    """Read the LoRA rank from adapter_config.json, or return None."""
+    config_file = lora_path / "adapter_config.json"
+    with contextlib.suppress(Exception):
+        data = json.loads(config_file.read_text())
+        rank = data.get("r")
+        if isinstance(rank, int):
+            return rank
+    return None
+
+
 def _parse_labels(labels_str: str) -> dict[str, str]:
     """Parse Docker's comma-separated 'key=value,key=value' label string."""
     result: dict[str, str] = {}
@@ -103,6 +116,9 @@ def build_docker_run_cmd(config: RunConfig) -> list[str]:
         f"--label={MODEL_LABEL}={config.model_id}",
         f"--label={MODEL_PATH_LABEL}={model_path}",
     ]
+    if config.lora_path is not None:
+        lora_abs = config.lora_path.resolve()
+        cmd += ["-v", f"{lora_abs}:/lora:ro"]
     if config.gpu:
         cmd += ["--gpus", "all"]
     cmd += [
@@ -120,6 +136,11 @@ def build_docker_run_cmd(config: RunConfig) -> list[str]:
     ]
     if config.max_model_len is not None:
         cmd += ["--max-model-len", str(config.max_model_len)]
+    if config.lora_path is not None:
+        adapter_name = config.lora_path.resolve().name
+        cmd += ["--enable-lora", "--lora-modules", f"{adapter_name}=/lora"]
+        if config.max_lora_rank is not None:
+            cmd += ["--max-lora-rank", str(config.max_lora_rank)]
     cmd += config.extra_args
     return cmd
 

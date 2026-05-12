@@ -10,6 +10,7 @@ from rich.table import Table
 
 from .runner import (
     RunConfig,
+    _detect_lora_rank,
     build_docker_run_cmd,
     list_containers,
     logs,
@@ -60,6 +61,17 @@ def run(
         Optional[int],
         typer.Option("--max-model-len", help="Override max context length"),
     ] = None,
+    lora: Annotated[
+        Optional[Path],
+        typer.Option("--lora", "-l", help="Path to LoRA adapter directory"),
+    ] = None,
+    max_lora_rank: Annotated[
+        Optional[int],
+        typer.Option(
+            "--max-lora-rank",
+            help="Max LoRA rank (auto-detected from adapter_config.json if omitted)",
+        ),
+    ] = None,
     detach: Annotated[
         bool,
         typer.Option(
@@ -82,6 +94,9 @@ def run(
     ] = None,
 ) -> None:
     """Start a vLLM container serving MODEL on PORT."""
+    if lora is not None and max_lora_rank is None:
+        max_lora_rank = _detect_lora_rank(lora)
+
     config = RunConfig(
         model_path=model,
         port=port,
@@ -89,6 +104,8 @@ def run(
         gpu=gpu,
         dtype=dtype,
         max_model_len=max_model_len,
+        lora_path=lora,
+        max_lora_rank=max_lora_rank,
         extra_args=extra or [],
     )
 
@@ -98,6 +115,10 @@ def run(
     console.print(f"  Model ID: {config.model_id}")
     console.print(f"  Port:     {port}")
     console.print(f"  GPU:      {'yes' if gpu else 'no'}")
+    if lora is not None:
+        console.print(f"  LoRA:     {lora.resolve()}")
+        if max_lora_rank is not None:
+            console.print(f"  LoRA rank: {max_lora_rank}")
     console.print()
 
     docker_cmd = build_docker_run_cmd(config)
