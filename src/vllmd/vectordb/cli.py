@@ -1,9 +1,7 @@
 """CLI subcommands for the vector context database."""
 
-from __future__ import annotations
-
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 import typer
 from rich.console import Console
@@ -97,7 +95,7 @@ def search(
     ] = COLLECTION_DOCUMENTS,
     n: Annotated[int, typer.Option("--n", help="Number of results")] = 5,
     session: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--session", "-s", help="Filter conversations by session ID"),
     ] = None,
     endpoint: Annotated[str, _ENDPOINT_OPT] = "http://localhost:8000",

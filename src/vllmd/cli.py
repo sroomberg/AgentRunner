@@ -1,10 +1,8 @@
 """CLI entry point."""
 
-from __future__ import annotations
-
 import subprocess
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 import typer
 from rich.console import Console
@@ -47,7 +45,7 @@ def run(
         typer.Option("--port", "-p", help="Host port to expose the vLLM API on"),
     ] = 8000,
     name: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--name", "-n", help=_NAME_HELP),
     ] = None,
     gpu: Annotated[
@@ -59,7 +57,7 @@ def run(
         typer.Option("--dtype", help="Model dtype (auto, float16, bfloat16, float32)"),
     ] = "auto",
     max_model_len: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--max-model-len", help="Override max context length"),
     ] = None,
     detach: Annotated[
@@ -79,7 +77,7 @@ def run(
         ),
     ] = True,
     extra: Annotated[
-        list[str] | None,
+        Optional[list[str]],
         typer.Argument(help="Extra args forwarded verbatim to vLLM"),
     ] = None,
 ) -> None:
@@ -135,11 +133,11 @@ def run(
 @app.command(name="stop")
 def stop_cmd(
     name: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--name", "-n", help="Container name to stop"),
     ] = None,
     port: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--port", "-p", help="Port of the container to stop"),
     ] = None,
     all_containers: Annotated[
@@ -201,7 +199,7 @@ def ps_cmd() -> None:
 @app.command(name="status")
 def status_cmd(
     name: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--name", "-n", help="Container name (omit to show all)"),
     ] = None,
 ) -> None:
@@ -262,7 +260,7 @@ def status_cmd(
 @app.command(name="logs")
 def logs_cmd(
     name: Annotated[
-        str | None,
+        Optional[str],
         typer.Option(
             "--name", "-n", help="Container name (auto-resolved if only one is running)"
         ),

@@ -33,6 +33,7 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+ignore = ["UP045"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["vllmd"]
