@@ -1,7 +1,5 @@
 """ChromaDB-backed vector store with collections for docs, code, and history."""
 
-from __future__ import annotations
-
 import contextlib
 import hashlib
 import time

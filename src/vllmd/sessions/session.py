@@ -1,7 +1,5 @@
 """Session dataclass with JSON persistence."""
 
-from __future__ import annotations
-
 import json
 import time
 from dataclasses import asdict, dataclass, field
@@ -42,7 +40,7 @@ class Session:
     @classmethod
     def load(
         cls, session_id: str, sessions_dir: Path = DEFAULT_SESSIONS_DIR
-    ) -> Session:
+    ) -> "Session":
         path = sessions_dir / f"{session_id}.json"
         if not path.exists():
             raise FileNotFoundError(f"Session '{session_id}' not found.")
@@ -51,7 +49,7 @@ class Session:
         return cls(**data, messages=messages)
 
     @classmethod
-    def list_all(cls, sessions_dir: Path = DEFAULT_SESSIONS_DIR) -> list[Session]:
+    def list_all(cls, sessions_dir: Path = DEFAULT_SESSIONS_DIR) -> "list[Session]":
         if not sessions_dir.exists():
             return []
         sessions = []
@@ -83,7 +81,7 @@ class Session:
         *,
         system_prompt: str = "",
         embedding_model: str = "",
-    ) -> Session:
+    ) -> "Session":
         return cls(
             id=session_id,
             endpoint=endpoint,

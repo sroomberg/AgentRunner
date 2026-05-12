@@ -1,7 +1,5 @@
 """Embedding client for vLLM's OpenAI-compatible /v1/embeddings endpoint."""
 
-from __future__ import annotations
-
 import json
 import urllib.request
 

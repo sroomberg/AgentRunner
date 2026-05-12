@@ -1,7 +1,5 @@
 """S3 sync for the ChromaDB vector store directory."""
 
-from __future__ import annotations
-
 import subprocess
 from pathlib import Path
 
