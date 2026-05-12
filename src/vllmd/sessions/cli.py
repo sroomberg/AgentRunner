@@ -20,17 +20,6 @@ session_app = typer.Typer(
 )
 console = Console()
 
-_SESSIONS_DIR_OPT = typer.Option(
-    None,
-    "--sessions-dir",
-    help="Sessions directory (default: ~/.vllmd/sessions)",
-)
-_DB_PATH_OPT = typer.Option(
-    None,
-    "--db-path",
-    help="Context vector store path (default: <sessions-dir>/<id>/vectordb)",
-)
-
 
 def _resolve_sessions_dir(override: Optional[Path]) -> Path:
     return override or DEFAULT_SESSIONS_DIR
@@ -111,8 +100,20 @@ def create(
             help="Model ID for context retrieval embeddings (leave empty to disable)",
         ),
     ] = "",
-    db_path: Annotated[Optional[Path], _DB_PATH_OPT] = None,
-    sessions_dir: Annotated[Optional[Path], _SESSIONS_DIR_OPT] = None,
+    db_path: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--db-path",
+            help="Context vector store path (default: <sessions-dir>/<id>/vectordb)",
+        ),
+    ] = None,
+    sessions_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--sessions-dir",
+            help="Sessions directory (default: ~/.vllmd/sessions)",
+        ),
+    ] = None,
 ) -> None:
     """Create a new chat session bound to a running model."""
     sdir = _resolve_sessions_dir(sessions_dir)
@@ -148,7 +149,13 @@ def create(
 
 @session_app.command(name="list")
 def list_cmd(
-    sessions_dir: Annotated[Optional[Path], _SESSIONS_DIR_OPT] = None,
+    sessions_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--sessions-dir",
+            help="Sessions directory (default: ~/.vllmd/sessions)",
+        ),
+    ] = None,
 ) -> None:
     """List all sessions."""
     sdir = _resolve_sessions_dir(sessions_dir)
@@ -182,7 +189,13 @@ def chat_cmd(
         int,
         typer.Option("--max-tokens", help="Max tokens for the response"),
     ] = 2048,
-    sessions_dir: Annotated[Optional[Path], _SESSIONS_DIR_OPT] = None,
+    sessions_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--sessions-dir",
+            help="Sessions directory (default: ~/.vllmd/sessions)",
+        ),
+    ] = None,
 ) -> None:
     """Send a single message in a session and print the response."""
     sdir = _resolve_sessions_dir(sessions_dir)
@@ -213,7 +226,13 @@ def attach(
         int,
         typer.Option("--max-tokens", help="Max tokens per response"),
     ] = 2048,
-    sessions_dir: Annotated[Optional[Path], _SESSIONS_DIR_OPT] = None,
+    sessions_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--sessions-dir",
+            help="Sessions directory (default: ~/.vllmd/sessions)",
+        ),
+    ] = None,
 ) -> None:
     """Open an interactive REPL for a session.
 
@@ -295,7 +314,13 @@ def history(
         int,
         typer.Option("--last", "-n", help="Show only the last N messages"),
     ] = 0,
-    sessions_dir: Annotated[Optional[Path], _SESSIONS_DIR_OPT] = None,
+    sessions_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--sessions-dir",
+            help="Sessions directory (default: ~/.vllmd/sessions)",
+        ),
+    ] = None,
 ) -> None:
     """Print the conversation history for a session."""
     sdir = _resolve_sessions_dir(sessions_dir)
@@ -311,7 +336,13 @@ def history(
 @session_app.command()
 def clear(
     session_id: Annotated[str, typer.Argument(help="Session ID")],
-    sessions_dir: Annotated[Optional[Path], _SESSIONS_DIR_OPT] = None,
+    sessions_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--sessions-dir",
+            help="Sessions directory (default: ~/.vllmd/sessions)",
+        ),
+    ] = None,
 ) -> None:
     """Clear the conversation history for a session (keeps session config)."""
     sdir = _resolve_sessions_dir(sessions_dir)
@@ -332,7 +363,13 @@ def clear(
 @session_app.command()
 def delete(
     session_id: Annotated[str, typer.Argument(help="Session ID")],
-    sessions_dir: Annotated[Optional[Path], _SESSIONS_DIR_OPT] = None,
+    sessions_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--sessions-dir",
+            help="Sessions directory (default: ~/.vllmd/sessions)",
+        ),
+    ] = None,
 ) -> None:
     """Delete a session and its metadata."""
     sdir = _resolve_sessions_dir(sessions_dir)

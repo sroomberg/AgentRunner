@@ -23,14 +23,6 @@ db_app = typer.Typer(
 )
 console = Console()
 
-_DB_PATH_OPT = typer.Option(
-    "./vectordb", "--db-path", help="Path to the ChromaDB directory"
-)
-_ENDPOINT_OPT = typer.Option(
-    "http://localhost:8000", "--endpoint", "-e", help="vLLM server endpoint"
-)
-_MODEL_OPT = typer.Option(..., "--model", "-m", help="Model ID for embeddings")
-
 
 def _embedder(endpoint: str, model_id: str):
     def _embed(texts: list[str]) -> list[list[float]]:
@@ -46,9 +38,15 @@ def ingest(
         str,
         typer.Option("--type", "-t", help="Collection type: documents or code"),
     ] = "documents",
-    endpoint: Annotated[str, _ENDPOINT_OPT] = "http://localhost:8000",
-    model: Annotated[str, _MODEL_OPT] = ...,
-    db_path: Annotated[Path, _DB_PATH_OPT] = Path("./vectordb"),
+    endpoint: Annotated[
+        str, typer.Option("--endpoint", "-e", help="vLLM server endpoint")
+    ] = "http://localhost:8000",
+    model: Annotated[
+        str, typer.Option("--model", "-m", help="Model ID for embeddings")
+    ] = ...,
+    db_path: Annotated[
+        Path, typer.Option("--db-path", help="Path to the ChromaDB directory")
+    ] = Path("./vectordb"),
 ) -> None:
     """Ingest documents or code files into the vector database."""
     embedder = _embedder(endpoint, model)
@@ -98,9 +96,15 @@ def search(
         Optional[str],
         typer.Option("--session", "-s", help="Filter conversations by session ID"),
     ] = None,
-    endpoint: Annotated[str, _ENDPOINT_OPT] = "http://localhost:8000",
-    model: Annotated[str, _MODEL_OPT] = ...,
-    db_path: Annotated[Path, _DB_PATH_OPT] = Path("./vectordb"),
+    endpoint: Annotated[
+        str, typer.Option("--endpoint", "-e", help="vLLM server endpoint")
+    ] = "http://localhost:8000",
+    model: Annotated[
+        str, typer.Option("--model", "-m", help="Model ID for embeddings")
+    ] = ...,
+    db_path: Annotated[
+        Path, typer.Option("--db-path", help="Path to the ChromaDB directory")
+    ] = Path("./vectordb"),
 ) -> None:
     """Search the vector database for relevant context."""
     store = VectorStore(db_path)
@@ -147,9 +151,15 @@ def history(
         str,
         typer.Option("--session", "-s", help="Session ID (default: 'default')"),
     ] = "default",
-    endpoint: Annotated[str, _ENDPOINT_OPT] = "http://localhost:8000",
-    model: Annotated[str, _MODEL_OPT] = ...,
-    db_path: Annotated[Path, _DB_PATH_OPT] = Path("./vectordb"),
+    endpoint: Annotated[
+        str, typer.Option("--endpoint", "-e", help="vLLM server endpoint")
+    ] = "http://localhost:8000",
+    model: Annotated[
+        str, typer.Option("--model", "-m", help="Model ID for embeddings")
+    ] = ...,
+    db_path: Annotated[
+        Path, typer.Option("--db-path", help="Path to the ChromaDB directory")
+    ] = Path("./vectordb"),
 ) -> None:
     """Store a conversation message in the history collection."""
     embedder = _embedder(endpoint, model)
@@ -170,9 +180,15 @@ def summarize(
         str,
         typer.Argument(help="Summary text to replace the session history"),
     ] = ...,
-    endpoint: Annotated[str, _ENDPOINT_OPT] = "http://localhost:8000",
-    model: Annotated[str, _MODEL_OPT] = ...,
-    db_path: Annotated[Path, _DB_PATH_OPT] = Path("./vectordb"),
+    endpoint: Annotated[
+        str, typer.Option("--endpoint", "-e", help="vLLM server endpoint")
+    ] = "http://localhost:8000",
+    model: Annotated[
+        str, typer.Option("--model", "-m", help="Model ID for embeddings")
+    ] = ...,
+    db_path: Annotated[
+        Path, typer.Option("--db-path", help="Path to the ChromaDB directory")
+    ] = Path("./vectordb"),
 ) -> None:
     """Replace a session's conversation history with an abridged summary."""
     embedder = _embedder(endpoint, model)
@@ -190,7 +206,9 @@ def sync(
         str,
         typer.Option("--direction", help="push (local → S3) or pull (S3 → local)"),
     ] = "push",
-    db_path: Annotated[Path, _DB_PATH_OPT] = Path("./vectordb"),
+    db_path: Annotated[
+        Path, typer.Option("--db-path", help="Path to the ChromaDB directory")
+    ] = Path("./vectordb"),
 ) -> None:
     """Sync the vector database to or from an S3 bucket."""
     if direction == "push":
@@ -210,7 +228,9 @@ def sync(
 
 @db_app.command()
 def stats(
-    db_path: Annotated[Path, _DB_PATH_OPT] = Path("./vectordb"),
+    db_path: Annotated[
+        Path, typer.Option("--db-path", help="Path to the ChromaDB directory")
+    ] = Path("./vectordb"),
 ) -> None:
     """Show collection sizes in the vector database."""
     store = VectorStore(db_path)
